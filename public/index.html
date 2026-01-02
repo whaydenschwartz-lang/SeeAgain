@@ -1,0 +1,2817 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>SeeAgain – Animate Your Memories</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root {
+      --sa-blue: #3761e2;          /* brand blue */
+      --sa-blue-soft: rgba(55, 97, 226, 0.12);
+      --sa-blue-glow: rgba(55, 97, 226, 0.35);
+      --sa-bg-soft: #f7f9ff;
+
+      /* design consistency */
+      --sa-radius-card: 28px;
+      --sa-radius-input: 18px;
+    }
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text",
+        "Segoe UI", sans-serif;
+      color: #0f172a;
+      background: radial-gradient(circle at top right, #e0ffe9 0, #f8fafc 45%, #f9fafb 100%);
+    }
+    .page-shell {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 48px 16px 64px;
+    }
+    /* HERO */
+    .hero {
+      text-align: center;
+      margin-bottom: 40px;
+    }
+    .hero-title {
+      font-size: 40px;
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      margin: 0 0 8px;
+    }
+    /* ===== CLEAN SEEAGAIN LOGOS (NO GLOW) ===== */
+    .logo-again {
+      color: var(--sa-blue);
+    }
+
+    /* Remove ALL glow / blur / halo effects from logos */
+    .nav-logo,
+    .hero-title,
+    .logo-again,
+    .nav-logo .logo-again,
+    .hero-title .logo-again,
+    .site-logo .logo-again,
+    .bottom-logo,
+    .bottom-logo .logo-again {
+      text-shadow: none !important;
+      filter: none !important;
+      box-shadow: none !important;
+      -webkit-text-stroke: 0 !important;
+    }
+
+    /* Ensure crisp, premium text rendering */
+    .nav-logo,
+    .hero-title,
+    .site-logo,
+    .bottom-logo {
+      text-rendering: geometricPrecision;
+    }
+
+    /* Bottom logo after FAQ */
+    .bottom-logo {
+      text-align: center;
+      font-size: 32px;
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      color: #0f172a;
+      margin: 28px 0 16px;
+    }
+    .hero-tagline {
+      margin: 0;
+      font-size: 16px;
+      color: #475569;
+      letter-spacing: 0.01em;
+    }
+    .hero-sub {
+      margin-top: 6px;
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--sa-blue);
+    }
+    /* GALLERY */
+    .gallery-section {
+      margin: 40px auto 52px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 24px;
+    }
+
+    /* Row that holds the small still + large video */
+    .gallery-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 28px;
+      position: relative;
+
+      /* slide + fade transition */
+      transform: translateX(0);
+      opacity: 1;
+      transition: transform 0.45s ease, opacity 0.45s ease;
+    }
+
+    /* When moving to the "next" item (swipe left / right arrow) */
+    .gallery-row.gallery-to-left {
+      transform: translateX(-40px);
+      opacity: 0;
+    }
+
+    /* When moving to the "previous" item */
+    .gallery-row.gallery-to-right {
+      transform: translateX(40px);
+      opacity: 0;
+    }
+
+    /* Small + large cards stay as-is (rounded etc.) */
+    .gallery-card-small,
+    .gallery-card-large {
+      border-radius: var(--sa-radius-card);
+      background: #ffffff;
+      box-shadow:
+        0 18px 60px rgba(15, 23, 42, 0.23),
+        0 0 0 1px rgba(148, 163, 184, 0.18);
+      overflow: hidden;
+    }
+
+    .gallery-card-small {
+      width: 180px;
+      height: 180px;
+    }
+
+    .gallery-card-large {
+      width: 320px;
+      height: 320px;
+    }
+
+    .gallery-card-small img,
+    .gallery-card-large video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    /* Disable old full-width controls */
+    .gallery-controls {
+      display: none;
+    }
+
+    /* Left arrow positioned beside the first image */
+    .gallery-nav-left {
+      position: absolute;
+      left: -90px;
+      top: 50%;
+      transform: translateY(-50%);
+    }
+    /* Right arrow positioned beside the last image */
+    .gallery-nav-right {
+      position: absolute;
+      right: -90px;
+      top: 50%;
+      transform: translateY(-50%);
+    }
+
+    /* Arrow buttons keep your glow, no movement on hover */
+    .gallery-nav-btn {
+      width: 44px;
+      height: 44px;
+      border-radius: 999px;
+      border: none;
+      background: #ffffff;
+      color: #111827;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+
+      box-shadow:
+        0 0 0 1px rgba(148, 163, 184, 0.35),
+        0 10px 30px rgba(55, 97, 226, 0.35);
+      transition:
+        background 0.18s ease,
+        box-shadow 0.18s ease;
+    }
+
+    /* Blue glow on hover, no vertical "bounce" */
+    .gallery-nav-btn:hover {
+      background: rgba(55, 97, 226, 0.08);
+      box-shadow:
+        0 0 0 1px rgba(148, 163, 184, 0.45),
+        0 14px 40px rgba(55, 97, 226, 0.45);
+    }
+
+    .gallery-nav-btn:active {
+      box-shadow:
+        0 0 0 1px rgba(148, 163, 184, 0.5),
+        0 10px 30px rgba(55, 97, 226, 0.4);
+    }
+    /* CARDS */
+    .card {
+      background: #ffffff;
+      border-radius: var(--sa-radius-card);
+      padding: 28px 28px 32px;
+      box-shadow:
+        0 14px 40px rgba(15, 23, 42, 0.16),
+        0 0 0 1px rgba(148, 163, 184, 0.12);
+    }
+    .card + .card {
+      margin-top: 24px;
+    }
+    .card-title {
+      font-size: 13px;
+      letter-spacing: 0.12em;
+      font-weight: 700;
+      color: #6b7280;
+      text-transform: uppercase;
+      margin: 0 0 12px;
+    }
+    .how-it-works-list {
+      padding-left: 20px;
+      margin: 0;
+      font-size: 14px;
+      color: #475569;
+    }
+    .how-it-works-list li + li {
+      margin-top: 6px;
+    }
+    .how-it-works-list strong {
+      font-weight: 600;
+      color: #111827;
+    }
+
+    /* ===== HOW IT WORKS (AliveMoment-style) ===== */
+    .howit {
+      position: relative;
+      padding: 22px 18px;
+      border-radius: 22px;
+      border: 1px solid rgba(148, 163, 184, 0.22);
+      background: rgba(255, 255, 255, 0.55);
+      overflow: hidden;
+    }
+
+    .howit-header {
+      text-align: center;
+      margin-bottom: 16px;
+    }
+
+    .howit-title {
+      margin: 0 0 6px;
+      font-size: 22px;
+      letter-spacing: -0.02em;
+      color: #0f172a;
+    }
+
+    .howit-steps {
+      position: relative;
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+      align-items: stretch;
+    }
+
+    .howit-card {
+      position: relative;
+      border-radius: 22px;
+      border: 1px solid rgba(148, 163, 184, 0.22);
+      background: rgba(255, 255, 255, 0.75);
+      padding: 16px 14px 14px;
+      min-height: 160px;
+      box-shadow: 0 12px 28px rgba(15, 23, 42, 0.06);
+    }
+
+    .howit-step-pill {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      height: 26px;
+      padding: 0 12px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: #0f172a;
+      background: rgba(37, 99, 235, 0.12);
+      border: 1px solid rgba(37, 99, 235, 0.18);
+      margin-bottom: 10px;
+    }
+
+    .howit-card h4 {
+      margin: 0 0 8px;
+      font-size: 18px;
+      letter-spacing: -0.02em;
+      color: #0f172a;
+    }
+
+    .howit-card p {
+      margin: 0;
+      font-size: 14px;
+      line-height: 1.45;
+      color: #475569;
+    }
+
+    .howit-card p + p {
+      margin-top: 8px;
+    }
+
+    /* Arrow connectors (desktop) */
+    .howit-arrows {
+      pointer-events: none;
+      position: absolute;
+      inset: 0;
+    }
+
+    .howit-arrow {
+      position: absolute;
+      width: 180px;
+      height: 80px;
+      opacity: 0.55;
+    }
+
+    /* These positions are tuned for 3 cards in one row. */
+    .howit-arrow.arrow-1 {
+      left: calc(33.333% - 18px);
+      top: 72px;
+      transform: translateX(-50%);
+    }
+
+    .howit-arrow.arrow-2 {
+      left: calc(66.666% - 18px);
+      top: 128px;
+      transform: translateX(-50%);
+    }
+
+    .howit-arrow path {
+      stroke: rgba(15, 23, 42, 0.55);
+      stroke-width: 5;
+      fill: none;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .howit-arrow marker path {
+      fill: rgba(15, 23, 42, 0.55);
+    }
+
+    @media (max-width: 860px) {
+      .howit-steps {
+        grid-template-columns: 1fr;
+      }
+      .howit-arrows {
+        display: none;
+      }
+      .howit-card {
+        min-height: unset;
+      }
+    }
+
+    /* ===== REMOVE HOW-IT-WORKS ARROWS ===== */
+    .howit-arrows,
+    .howit-arrow {
+      display: none !important;
+    }
+
+    /* ===== FAQ Accordion (multi-open + clean spacing) ===== */
+    /* ===== STORY CARDS SECTION ===== */
+    .story-section {
+      padding: 32px 24px 36px;
+      border-radius: 22px;
+      border: 1px solid rgba(148, 163, 184, 0.22);
+      background: rgba(241, 245, 249, 0.6);
+      margin: 48px 0 40px;
+    }
+    .story-section-header {
+      text-align: center;
+      margin-bottom: 28px;
+    }
+    .story-section-title {
+      margin: 0 0 6px;
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      color: #0f172a;
+    }
+    .story-section-subtitle {
+      margin: 0;
+      font-size: 15px;
+      color: #64748b;
+    }
+    .story-cards {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 32px;
+      padding: 0 8px;
+    }
+    @media (max-width: 820px) {
+      .story-section {
+        padding: 24px 16px 28px;
+        margin: 32px 0 28px;
+      }
+      .story-cards {
+        grid-template-columns: 1fr;
+        gap: 36px;
+        max-width: 300px;
+        margin-left: auto;
+        margin-right: auto;
+      }
+    }
+    .story-card {
+      text-align: center;
+    }
+    .story-card-visual {
+      width: 75%;
+      aspect-ratio: 1 / 1;
+      margin: 0 auto 20px;
+      border-radius: var(--sa-radius-card);
+      background: #ffffff;
+      box-shadow:
+        0 8px 24px rgba(55, 97, 226, 0.35),
+        0 16px 48px rgba(55, 97, 226, 0.25),
+        0 0 0 1px rgba(55, 97, 226, 0.12);
+      overflow: hidden;
+    }
+    .story-card-accent {
+      display: none;
+    }
+    .story-card-video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+    .story-card-title {
+      margin: 0 0 10px;
+      font-size: 20px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      color: #0f172a;
+      line-height: 1.3;
+    }
+    .story-card-desc {
+      margin: 0;
+      font-size: 15px;
+      line-height: 1.55;
+      color: #475569;
+      max-width: 280px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    #faq {
+      scroll-margin-top: 90px;
+    }
+    .faq {
+      margin-top: 18px;
+      padding: 20px 18px;
+      border-radius: 28px;
+      border: 1px solid rgba(148, 163, 184, 0.22);
+      background: rgba(255, 255, 255, 0.55);
+      box-shadow: 0 18px 40px rgba(15, 23, 42, 0.06);
+    }
+    .faq-header {
+      text-align: center;
+      margin-bottom: 14px;
+    }
+    .faq-title {
+      margin: 0 0 6px;
+      font-size: 22px;
+      letter-spacing: -0.02em;
+      color: #0f172a;
+    }
+    .faq-subtitle {
+      margin: 0;
+      font-size: 14px;
+      color: #475569;
+    }
+    .faq-list {
+      margin-top: 14px;
+      border-radius: 22px;
+      overflow: hidden;
+      border: 1px solid rgba(148, 163, 184, 0.22);
+      background: rgba(255, 255, 255, 0.72);
+    }
+    .faq-item {
+      border-top: 1px solid rgba(148, 163, 184, 0.20);
+      background: transparent;
+    }
+    .faq-item:first-child {
+      border-top: none;
+    }
+    .faq-item summary {
+      list-style: none;
+      cursor: pointer;
+      padding: 18px 18px;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 14px;
+      align-items: center;
+      font-weight: 800;
+      color: #0f172a;
+      user-select: none;
+    }
+    /* Hide default marker */
+    .faq-item summary::-webkit-details-marker {
+      display: none;
+    }
+    .faq-q {
+      font-size: 16px;
+      letter-spacing: -0.01em;
+      line-height: 1.25;
+    }
+    /* Icon button */
+    .faq-icon {
+      width: 38px;
+      height: 38px;
+      border-radius: 999px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid rgba(37, 99, 235, 0.18);
+      background: rgba(37, 99, 235, 0.10);
+      color: #0f172a;
+      font-size: 18px;
+      line-height: 1;
+      transition: transform 180ms ease, background 180ms ease;
+      flex: 0 0 auto;
+    }
+    /* Rotate + to become × when open */
+    .faq-item[open] .faq-icon {
+      transform: rotate(45deg);
+      background: rgba(37, 99, 235, 0.14);
+    }
+    /* Answer spacing */
+    .faq-a {
+      padding: 0 18px 18px;
+      color: #475569;
+      font-size: 14px;
+      line-height: 1.65;
+    }
+    /* Add a bit of separation from the summary line */
+    .faq-item[open] summary {
+      padding-bottom: 12px;
+    }
+    /* Optional: subtle hover */
+    .faq-item summary:hover {
+      background: rgba(2, 6, 23, 0.02);
+    }
+    /* Focus ring */
+    .faq-item summary:focus-visible {
+      outline: 2px solid rgba(37, 99, 235, 0.35);
+      outline-offset: -2px;
+      border-radius: 14px;
+    }
+
+    /* ===== Upload label row ===== */
+    .upload-label {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 8px;
+    }
+    .upload-title {
+      font-weight: 800;
+      font-size: 16px;
+      color: #0f172a;
+    }
+    .upload-or {
+      font-size: 14px;
+      color: #64748b;
+    }
+    .example-photo-inline {
+      background: none;
+      border: none;
+      padding: 0;
+      margin: 0;
+      font-size: 14px;
+      font-weight: 600;
+      color: #3b82f6;
+      cursor: pointer;
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
+    .example-photo-inline:hover {
+      color: #2563eb;
+    }
+
+    /* ===== Subtitle / helper text sizing (global polish) ===== */
+    .subtitle,
+    .faq-subtitle,
+    .helper-text,
+    .hint-text,
+    .row-subtitle,
+    .animation-subtext,
+    .instruction-subtext {
+      font-size: 15px !important;
+      line-height: 1.55;
+      color: #475569;
+    }
+    /* Animation Instructions helper line */
+    .animation-instructions p,
+    .animation-instructions .note,
+    .animation-instructions small {
+      font-size: 15px;
+      line-height: 1.55;
+    }
+    /* FAQ answers slightly larger for readability */
+    .faq-a {
+      font-size: 15px;
+      line-height: 1.7;
+    }
+
+    /* ===== Step Labels ===== */
+    .step-label {
+      display: flex;
+      align-items: center;
+      margin-bottom: 6px;
+    }
+    /* Make STEP pills bigger + more "premium" */
+    .step-pill {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+
+      font-size: 13px;          /* bigger */
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      padding: 8px 14px;        /* bigger */
+      border-radius: 999px;
+      text-transform: uppercase;
+
+      margin-bottom: 12px;      /* adds breathing room before title */
+      color: #0f172a;
+      background: rgba(59, 130, 246, 0.12);
+      border: 1px solid rgba(59, 130, 246, 0.2);
+    }
+    /* Vertical rhythm tuning */
+    .step-spacing-top {
+      margin-top: 26px;
+    }
+    .step-spacing-bottom {
+      margin-bottom: 12px;
+    }
+    .step-helper {
+      margin: 0 0 24px;
+      font-size: 15px;
+      line-height: 1.6;
+      color: #475569;
+    }
+
+    /* Prompt suggestions row */
+    .prompt-suggestions-row {
+      margin-top: 14px;
+      margin-bottom: 6px;
+    }
+
+    /* Secondary button (Get Prompt Suggestions) */
+    .secondary-btn {
+      background: linear-gradient(180deg, #4f6ef7, #3b5bfd);
+      color: #fff;
+      border: none;
+      border-radius: 999px;
+      padding: 12px 18px;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: 0 10px 24px rgba(59, 91, 253, 0.25);
+    }
+    .secondary-btn:hover {
+      filter: brightness(1.05);
+    }
+
+    /* Animate button spacing */
+    .animate-btn {
+      margin-top: 10px;
+    }
+
+    /* =========================
+       FORM STEPS ONLY (NOT the 3-box "How it works")
+       ========================= */
+    .steps-form .step-pill {
+      height: 30px;
+      padding: 0 14px;
+      font-size: 13px;
+      font-weight: 900;
+      letter-spacing: 0.07em;
+    }
+
+    /* Make the FORM section headings larger */
+    .steps-form .section-title,
+    .steps-form h3,
+    .steps-form .row-label {
+      font-size: 18px;
+      line-height: 1.25;
+    }
+
+    .steps-form .section-title {
+      margin: 6px 0 10px;
+      font-weight: 900;
+      letter-spacing: -0.02em;
+      color: #0f172a;
+    }
+
+    /* Prompt suggestions button area — remove extra bottom spacing */
+    .steps-form .prompt-suggestions-row {
+      margin-top: 14px;
+      margin-bottom: 0 !important;
+    }
+
+    /* Step 2 helper line — move down to match Step 3 rhythm */
+    .steps-form .instruction-subtext-below {
+      margin-top: 20px !important;   /* <-- this is the "move down" */
+      margin-bottom: 18px !important;
+      font-size: 15px;
+      line-height: 1.6;
+      color: #475569;
+    }
+
+    /* Step spacing + overall rhythm */
+    .steps-form .step-label {
+      margin-top: 24px;
+      margin-bottom: 8px;
+    }
+
+    /* ===== RESTORE ANIMATION INSTRUCTIONS TEXTAREA (DO NOT MODIFY) ===== */
+    /* Force the Animation Instructions textarea back to full size */
+    .textarea-input,
+    textarea {
+      width: 100% !important;
+      min-height: 120px !important;
+      padding: 16px 18px !important;
+
+      font-size: 15px !important;
+      line-height: 1.45 !important;
+      font-family: inherit !important;
+
+      background: #f9fafb !important;
+      border-radius: 16px !important;
+      border: 1px solid #e5e7eb !important;
+      background: #ffffff !important;
+
+      resize: vertical;
+      box-sizing: border-box;
+    }
+
+    /* Keep spacing BELOW textarea consistent */
+    .textarea-input {
+      margin-top: 10px;
+      margin-bottom: 14px;
+    }
+    .textarea-input:hover {
+      border-color: #cbd5e1 !important;
+      background: #ffffff !important;
+    }
+    .textarea-input:focus {
+      border-color: var(--sa-blue) !important;
+      background: #ffffff !important;
+      box-shadow: 0 0 0 1px var(--sa-blue-soft), 0 0 0 3px rgba(55, 97, 226, 0.15) !important;
+      outline: none !important;
+    }
+
+    /* Step helper spacing — same rhythm for Step 2 and Step 3 */
+    .steps-form .step-helper,
+    .steps-form .step-description {
+      margin-top: 20px;
+      margin-bottom: 14px;
+      font-size: 15px;
+      line-height: 1.6;
+      color: #475569;
+    }
+
+    /* ===== STEP SECTION SPACING + BIGGER PILLS/TEXT + CLEAN BUTTON/TEXT SEPARATION ===== */
+
+    /* Overall step block spacing */
+    .step {
+      margin-top: 28px;
+    }
+    .step:first-of-type {
+      margin-top: 0;
+    }
+
+    /* Step titles (Upload a Photo / Animation Instructions / etc.) */
+    .step-title {
+      font-size: 22px;          /* bigger */
+      font-weight: 800;
+      line-height: 1.15;
+      margin: 0 0 12px;
+    }
+
+    /* Optional "or Try an example photo" row */
+    .step-subrow {
+      margin-top: 6px;
+      font-size: 15px;
+    }
+
+    /* Wrapper for buttons inside steps */
+    .step-action {
+      margin-top: 14px;
+    }
+
+    /* Helper text under buttons (STEP 2 + STEP 3) */
+    .step-helper,
+    .step-description {
+      margin-top: 20px;      /* SAME spacing for both */
+      font-size: 15px;
+      line-height: 1.45;
+      color: #334155;
+    }
+
+    /* Make Step 3 feel intentional */
+    .step.step-3 {
+      margin-top: 34px;
+      padding-top: 6px;
+    }
+
+    /* Animate button spacing */
+    .steps-form .animate-btn {
+      margin-top: 8px;
+      margin-bottom: 16px;
+    }
+
+    /* FORM / UPLOAD AREA */
+    .row {
+      margin-bottom: 24px;
+    }
+    .row-label {
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 6px;
+      color: #111827;
+    }
+    .dropzone {
+      border-radius: 16px;
+      border: 1px solid #e5e7eb;
+      background: #f9fafb;
+      min-height: 120px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 16px 18px;
+      font-size: 15px;
+      color: #6b7280;
+      background: #f8fafc;
+      cursor: pointer;
+      transition:
+        border-color 0.18s ease,
+        background 0.18s ease,
+        box-shadow 0.18s ease;
+    }
+    .dropzone.dragover {
+      border-color: var(--sa-blue);
+      background: #ffffff;
+      box-shadow: 0 0 0 1px var(--sa-blue-soft), 0 0 0 3px rgba(55, 97, 226, 0.15);
+    }
+    .dropzone:hover {
+      border-color: #cbd5e1;
+      background: #ffffff;
+    }
+    .text-input {
+      width: 100%;
+      border-radius: var(--sa-radius-input);
+      border: 1px solid #e5e7eb;
+      padding: 12px 14px;
+      min-height: 72px;
+      font-size: 14px;
+      resize: vertical;
+      font-family: inherit;
+      color: #111827;
+      background: #f9fafb;
+      transition:
+        border-color 0.18s ease,
+        box-shadow 0.18s ease,
+        background 0.18s ease;
+    }
+    .text-input:focus,
+    .dropzone:focus-visible {
+      outline: none;
+      border-color: var(--sa-blue);
+      box-shadow: 0 0 0 1px var(--sa-blue-soft), 0 0 0 3px rgba(55, 97, 226, 0.25);
+      background: #ffffff;
+    }
+    /* BUTTONS */
+    .button-row {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .btn-outline {
+      border-radius: 999px;
+      padding: 9px 18px;
+      font-size: 13px;
+      font-weight: 500;
+      border: 1px solid var(--sa-blue);
+      background: #ffffff;
+      color: var(--sa-blue);
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition:
+        background 0.18s ease,
+        color 0.18s ease,
+        box-shadow 0.18s ease,
+        transform 0.15s ease;
+    }
+    .btn-outline:hover {
+      background: #eff4ff;
+      box-shadow: 0 10px 30px rgba(15, 23, 42, 0.18);
+      transform: translateY(-1px);
+    }
+
+    /* Prompt suggestion selected state (must come AFTER .btn-outline) */
+    .btn-outline.prompt-selected {
+      background: var(--sa-blue);
+      color: #ffffff;
+      border-color: var(--sa-blue);
+      box-shadow:
+        0 14px 35px rgba(55, 97, 226, 0.45),
+        0 0 0 1px rgba(15, 23, 42, 0.08);
+    }
+
+    .btn-outline.prompt-selected:hover {
+      background: var(--sa-blue);
+      color: #ffffff;
+      transform: translateY(-1px);
+    }
+
+    .btn-primary {
+      border-radius: 999px;
+      padding: 11px 26px;
+      font-size: 14px;
+      font-weight: 600;
+      border: none;
+      background: radial-gradient(circle at 20% 0%, #5a7fff 0, var(--sa-blue) 40%, #2642b0 85%);
+      color: #ffffff;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      box-shadow:
+        0 18px 45px var(--sa-blue-glow),
+        0 0 0 1px rgba(15, 23, 42, 0.05);
+      transition:
+        background 0.18s ease,
+        box-shadow 0.18s ease,
+        transform 0.15s ease;
+    }
+    .btn-primary:hover {
+      box-shadow:
+        0 24px 60px rgba(55, 97, 226, 0.5),
+        0 0 0 1px rgba(15, 23, 42, 0.08);
+      transform: translateY(-1px);
+    }
+    .btn-primary:active {
+      transform: translateY(0) scale(0.98);
+      box-shadow:
+        0 12px 28px rgba(55, 97, 226, 0.4),
+        0 0 0 1px rgba(15, 23, 42, 0.1);
+    }
+    .btn-primary:disabled {
+      opacity: 0.6;
+      cursor: default;
+      transform: none;
+      box-shadow:
+        0 12px 28px rgba(148, 163, 184, 0.4),
+        0 0 0 1px rgba(148, 163, 184, 0.3);
+    }
+    .helper-text {
+      font-size: 12px;
+      color: #6b7280;
+      margin-top: 6px;
+    }
+    .status-text {
+      margin-top: 10px;
+      font-size: 13px;
+      color: #64748b;
+    }
+    .status-text.error {
+      color: #b91c1c;
+    }
+    .footer {
+      text-align: center;
+      font-size: 12px;
+      color: #9ca3af;
+      margin-top: 28px;
+    }
+    #videoActions {
+      justify-content: center;
+      gap: 12px;
+    }
+
+    /* ===============================
+       VIDEO + WATERMARK FIX
+       =============================== */
+
+    /* Wrapper controls size + centering */
+    .video-wrapper {
+      position: relative;
+      display: block;
+      width: 100%;
+      max-width: 600px;      /* MOVE max-width here */
+      margin: 16px auto 0;   /* Center wrapper */
+      border-radius: 18px;
+      overflow: hidden;
+    }
+
+    /* Video fills wrapper */
+    .result-video {
+      width: 100%;
+      display: block;
+      border-radius: inherit;
+    }
+
+    /* Watermark stays pinned to video */
+    .video-watermark {
+      position: absolute;
+      right: 12px;
+      bottom: 10px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: rgba(15, 23, 42, 0.55);
+      box-shadow: 0 6px 18px rgba(15, 23, 42, 0.25);
+      pointer-events: none;
+      display: inline-flex;
+      align-items: center;
+    }
+
+    .video-watermark-logo {
+      height: 16px;     /* tweak: 14–18px */
+      width: auto;
+      display: block;
+      opacity: 0.95;
+    }
+
+    /* Top brand header */
+    .site-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 32px;
+      padding: 4px 2px;
+    }
+
+    .site-logo {
+      font-size: 18px;
+      font-weight: 800;
+      letter-spacing: -0.04em;
+    }
+
+
+    .site-nav {
+      display: flex;
+      gap: 8px;
+    }
+
+    .site-nav a {
+      font-size: 13px;
+      padding: 6px 12px;
+      border-radius: 999px;
+      color: #64748b;
+      text-decoration: none;
+      background: transparent;
+      transition:
+        background 0.18s ease,
+        color 0.18s ease,
+        box-shadow 0.18s ease;
+    }
+
+    .site-nav a:hover {
+      background: var(--sa-blue-soft);
+      color: var(--sa-blue);
+      box-shadow: 0 10px 26px rgba(15, 23, 42, 0.16);
+    }
+
+    /* Header layout polish: logo left, actions right, better spacing */
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-right: 10px;
+      position: relative;
+    }
+
+    .header-contact {
+      font-size: 14px;
+      font-weight: 800;
+      color: #0f172a;
+      text-decoration: none;
+      padding: 10px 12px;
+      border-radius: 999px;
+    }
+
+    .header-contact:hover {
+      background: rgba(15, 23, 42, 0.06);
+    }
+
+    .lang-btn {
+      width: 38px;
+      height: 38px;
+      border-radius: 999px;
+      border: 1px solid rgba(15, 23, 42, 0.12);
+      background: #ffffff;
+      cursor: pointer;
+      font-size: 18px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .lang-btn:hover {
+      background: rgba(15, 23, 42, 0.05);
+    }
+
+    /* AliveMoment-style menu */
+    .lang-menu {
+      position: absolute;
+      top: 48px;
+      right: 0;
+      width: 240px;
+      max-height: 360px;
+      overflow: auto;
+      background: #3a3a3a;
+      border-radius: 14px;
+      padding: 8px;
+      display: none;
+      z-index: 9999;
+      box-shadow: 0 22px 55px rgba(0, 0, 0, 0.35);
+    }
+
+    .lang-item {
+      width: 100%;
+      text-align: left;
+      background: transparent;
+      border: none;
+      color: #fff;
+      font-size: 15px;
+      font-weight: 600;
+      padding: 10px 10px;
+      border-radius: 10px;
+      cursor: pointer;
+    }
+
+    .lang-item:hover {
+      background: rgba(255, 255, 255, 0.10);
+    }
+
+    .lang-item.active {
+      background: rgba(59, 130, 246, 0.35);
+    }
+
+    /* ===== Trust Bar — STRONG BRAND GLOW ===== */
+    .trust-bar {
+      background: var(--sa-blue);
+      color: #ffffff;
+      border-radius: 999px;
+      padding: 14px 28px;
+      margin: 40px auto 32px;
+      width: calc(100% - 48px);
+      max-width: 1100px;
+
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 28px;
+
+      position: relative;
+      isolation: isolate;
+
+      /* Primary glow + depth */
+      box-shadow:
+        0 22px 60px rgba(55, 97, 226, 0.55),
+        0 6px 18px rgba(55, 97, 226, 0.35),
+        0 0 0 1px rgba(15, 23, 42, 0.06);
+    }
+
+    /* Outer halo bloom */
+    .trust-bar::after {
+      content: "";
+      position: absolute;
+      inset: -18px;
+      border-radius: inherit;
+
+      background: radial-gradient(
+        ellipse at center,
+        rgba(55, 97, 226, 0.45),
+        rgba(55, 97, 226, 0.18) 45%,
+        transparent 75%
+      );
+
+      filter: blur(10px);
+      z-index: -1;
+      pointer-events: none;
+    }
+
+    .trust-bar-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 14px;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    .trust-bar .icon {
+      color: #ffffff;
+      font-size: 14px;
+    }
+
+    /* ===== Mobile ===== */
+    @media (max-width: 900px) {
+      .trust-bar {
+        flex-direction: column;
+        gap: 10px;
+        border-radius: 20px;
+        width: calc(100% - 32px);
+        text-align: center;
+      }
+
+      .trust-bar-item {
+        white-space: normal;
+        justify-content: center;
+      }
+    }
+
+    /* ===== SeeAgain Blue Feature Bar Glow ===== */
+    /* Matches Animate / Suggest Prompts button glow */
+    .blue-bar {
+      background: var(--sa-blue);
+      border-radius: 999px;
+      padding: 14px 24px;
+      position: relative;
+      box-shadow:
+        0 18px 45px rgba(55, 97, 226, 0.35),
+        0 0 0 1px rgba(15, 23, 42, 0.05);
+    }
+
+    /* Soft halo glow */
+    .blue-bar::after {
+      content: "";
+      position: absolute;
+      inset: -6px;
+      border-radius: inherit;
+      background: radial-gradient(
+        ellipse at center,
+        rgba(55, 97, 226, 0.25),
+        transparent 70%
+      );
+      z-index: -1;
+    }
+
+    /* ===== RESPONSIVE / MOBILE ===== */
+    @media (max-width: 768px) {
+      .page-shell {
+        padding: 24px 14px 32px;
+      }
+
+      /* Header */
+      .site-header {
+        padding: 12px 14px;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+      .site-logo {
+        font-size: 22px;
+      }
+      .header-contact {
+        font-size: 12px;
+        padding: 6px 10px;
+      }
+      .lang-btn {
+        width: 34px;
+        height: 34px;
+        font-size: 16px;
+      }
+
+      /* Hero */
+      .hero {
+        margin-bottom: 28px;
+        text-align: center;
+      }
+      .hero-title {
+        font-size: 30px;
+      }
+      .hero-tagline {
+        font-size: 14px;
+      }
+      .hero-sub {
+        font-size: 13px;
+      }
+
+      /* Gallery */
+      .gallery-section {
+        margin-bottom: 20px;
+      }
+      .gallery-row {
+        flex-direction: column;
+        gap: 16px;
+      }
+      .gallery-card-small,
+      .gallery-card-large {
+        width: 100%;
+        max-width: 280px;
+        height: auto;
+        aspect-ratio: 1 / 1;
+        margin: 0 auto;
+      }
+      .gallery-nav-btn {
+        width: 36px;
+        height: 36px;
+        font-size: 16px;
+      }
+      .gallery-nav-left {
+        left: 4px;
+      }
+      .gallery-nav-right {
+        right: 4px;
+      }
+
+      /* Trust Bar */
+      .trust-bar {
+        padding: 14px 16px;
+        gap: 8px;
+      }
+      .trust-bar-item {
+        font-size: 12px;
+      }
+
+      /* Steps Form */
+      .steps-form {
+        padding: 18px 14px 22px;
+      }
+      .step-pill {
+        font-size: 12px;
+        padding: 0 12px;
+        height: 28px;
+      }
+      .step-title {
+        font-size: 18px;
+      }
+      .dropzone {
+        min-height: 100px;
+        padding: 14px;
+        font-size: 14px;
+      }
+      .textarea-input,
+      textarea {
+        min-height: 100px !important;
+        font-size: 14px !important;
+        padding: 14px !important;
+      }
+      .btn-primary {
+        padding: 10px 20px;
+        font-size: 13px;
+      }
+      .btn-outline {
+        padding: 8px 14px;
+        font-size: 12px;
+      }
+      .step-helper,
+      .step-description {
+        font-size: 14px;
+      }
+      .upload-title {
+        font-size: 16px;
+      }
+      .example-photo-inline {
+        font-size: 13px;
+      }
+
+      /* How It Works */
+      .howit {
+        padding: 18px 14px;
+      }
+      .howit-title {
+        font-size: 20px;
+      }
+      .howit-card {
+        padding: 18px 14px;
+      }
+      .howit-step-pill {
+        font-size: 11px;
+        padding: 4px 10px;
+      }
+      .howit-card h4 {
+        font-size: 15px;
+      }
+      .howit-card p {
+        font-size: 13px;
+      }
+
+      /* Story Cards */
+      .story-section {
+        padding: 20px 14px 24px;
+        margin: 24px 0 20px;
+      }
+      .story-section-title {
+        font-size: 20px;
+      }
+      .story-section-subtitle {
+        font-size: 14px;
+      }
+      .story-cards {
+        gap: 28px;
+      }
+      .story-card-visual {
+        width: 85%;
+      }
+      .story-card-title {
+        font-size: 17px;
+      }
+      .story-card-desc {
+        font-size: 14px;
+      }
+
+      /* FAQ */
+      .faq {
+        padding: 18px 14px;
+      }
+      .faq-title {
+        font-size: 20px;
+      }
+      .faq-subtitle {
+        font-size: 14px;
+      }
+      .faq-q {
+        font-size: 14px;
+      }
+      .faq-a {
+        font-size: 13px;
+      }
+
+      /* Bottom Logo */
+      .bottom-logo {
+        font-size: 26px;
+        margin: 20px 0 12px;
+      }
+
+      /* Footer */
+      .footer {
+        font-size: 12px;
+        padding: 16px 14px;
+      }
+
+      /* Video Result */
+      .video-wrapper {
+        border-radius: 16px;
+      }
+      .result-video {
+        border-radius: 16px;
+      }
+    }
+
+    /* Extra small screens (phones in portrait) */
+    @media (max-width: 400px) {
+      .hero-title {
+        font-size: 26px;
+      }
+      .site-logo {
+        font-size: 20px;
+      }
+      .gallery-card-small,
+      .gallery-card-large {
+        max-width: 240px;
+      }
+      .btn-primary {
+        padding: 9px 16px;
+        font-size: 12px;
+      }
+      .step-title {
+        font-size: 16px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="page-shell">
+    <!-- SITE HEADER -->
+    <header class="site-header">
+      <div class="site-logo">
+        See<span class="logo-again">Again</span>
+      </div>
+      <div class="header-actions">
+        <a href="/contact.html" class="header-contact">Contact Us</a>
+
+        <button id="langToggle" class="lang-btn" aria-label="Change language" type="button">
+          🌐
+        </button>
+
+        <!-- Custom language menu (opens immediately) -->
+        <div id="langMenu" class="lang-menu" role="menu" aria-label="Languages">
+          <button class="lang-item" data-lang="en" role="menuitem">English</button>
+          <button class="lang-item" data-lang="es" role="menuitem">Español</button>
+          <button class="lang-item" data-lang="fr" role="menuitem">Français</button>
+          <button class="lang-item" data-lang="de" role="menuitem">Deutsch</button>
+          <button class="lang-item" data-lang="it" role="menuitem">Italiano</button>
+          <button class="lang-item" data-lang="pt" role="menuitem">Português</button>
+          <button class="lang-item" data-lang="pt-BR" role="menuitem">Português (Brasil)</button>
+          <button class="lang-item" data-lang="ru" role="menuitem">Русский</button>
+          <button class="lang-item" data-lang="uk" role="menuitem">Українська</button>
+          <button class="lang-item" data-lang="ro" role="menuitem">Română</button>
+          <button class="lang-item" data-lang="el" role="menuitem">Ελληνικά</button>
+          <button class="lang-item" data-lang="hu" role="menuitem">Magyar</button>
+          <button class="lang-item" data-lang="pl" role="menuitem">Polski</button>
+          <button class="lang-item" data-lang="ar" role="menuitem">العربية</button>
+          <button class="lang-item" data-lang="bg" role="menuitem">Bulgarian</button>
+          <button class="lang-item" data-lang="no" role="menuitem">Norwegian</button>
+          <button class="lang-item" data-lang="da" role="menuitem">Danish</button>
+          <button class="lang-item" data-lang="sk" role="menuitem">Slovak</button>
+
+          <!-- Hidden Google translate mount -->
+          <div id="google_translate_element" style="display:none;"></div>
+        </div>
+      </div>
+    </header>
+
+    <!-- HERO -->
+    <header class="hero">
+      <h1 class="hero-title">
+        See<span class="logo-again">Again</span>
+      </h1>
+      <p class="hero-tagline">
+        Upload a picture, choose a prompt, and watch your memories come alive.
+      </p>
+      <p class="hero-sub">Your first animation is free.</p>
+    </header>
+
+    <!-- GALLERY (no text label) -->
+    <section class="gallery-section" id="examples">
+      <div class="gallery-row">
+        <button id="gallery-prev" class="gallery-nav-btn gallery-nav-left" type="button" aria-label="Previous example">←</button>
+
+        <div class="gallery-card-small">
+          <img id="gallery-still" src="/gallery/example1-still (1).jpg" alt="Example still" />
+        </div>
+        <div class="gallery-card-large">
+          <video
+            id="gallery-video"
+            src="/gallery/example1-video (1).mp4"
+            autoplay
+            muted
+            loop
+            playsinline
+          ></video>
+        </div>
+
+        <button id="gallery-next" class="gallery-nav-btn gallery-nav-right" type="button" aria-label="Next example">→</button>
+      </div>
+    </section>
+
+    <!-- Trust Bar (Brand Blue) -->
+    <div class="trust-bar">
+      <div class="trust-bar-item">
+        <span class="icon">⚡</span>
+        <span>Takes only a minute to start</span>
+      </div>
+
+      <div class="trust-bar-item">
+        <span class="icon">✓</span>
+        <span>No tech skills needed</span>
+      </div>
+
+      <div class="trust-bar-item">
+        <span class="icon">♥</span>
+        <span>Made to bring memories to life</span>
+      </div>
+    </div>
+
+    <!-- Main Card -->
+    <section class="card">
+      <form id="photoForm" enctype="multipart/form-data">
+
+        <!-- How it works -->
+        <div class="row howit" id="how-it-works">
+          <div class="howit-header">
+            <h3 class="howit-title">How it works</h3>
+          </div>
+
+          <div class="howit-steps">
+            <!-- arrows (desktop only) -->
+            <div class="howit-arrows" aria-hidden="true">
+              <svg class="howit-arrow arrow-1" viewBox="0 0 220 110">
+                <defs>
+                  <marker id="arrowHead1" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+                    <path d="M0,0 L10,5 L0,10 Z"></path>
+                  </marker>
+                </defs>
+                <path d="M10,20 C90,20 90,90 200,90" marker-end="url(#arrowHead1)"></path>
+              </svg>
+
+              <svg class="howit-arrow arrow-2" viewBox="0 0 220 110">
+                <defs>
+                  <marker id="arrowHead2" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+                    <path d="M0,0 L10,5 L0,10 Z"></path>
+                  </marker>
+                </defs>
+                <path d="M10,90 C90,90 90,20 200,20" marker-end="url(#arrowHead2)"></path>
+              </svg>
+            </div>
+
+            <div class="howit-card">
+              <div class="howit-step-pill">Step 1</div>
+              <h4>Upload a Photo</h4>
+              <p>Upload or drag in a photo you love.</p>
+            </div>
+
+            <div class="howit-card">
+              <div class="howit-step-pill">Step 2</div>
+              <h4>Choose a Prompt</h4>
+              <p>Select a suggested prompt or write your own motion description.</p>
+            </div>
+
+            <div class="howit-card">
+              <div class="howit-step-pill">Step 3</div>
+              <h4>Animate, Download & Share</h4>
+              <p>Click <strong>Animate Photo</strong> and let the model do its thing.</p>
+              <p>Download or share your animated memory.</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- FORM STEPS WRAPPER (scoped styles for larger pills/titles) -->
+        <div class="steps-form">
+
+        <!-- Step 1 -->
+        <div class="step-label">
+          <span class="step-pill">Step 1</span>
+        </div>
+
+        <!-- Photo Upload -->
+      <div class="row">
+          <div class="row-label upload-label">
+            <span class="upload-title">Upload a Photo</span>
+            <span class="upload-or">or</span>
+            <button
+              type="button"
+              class="example-photo-inline"
+              onclick="useExamplePhoto()"
+            >
+              Try an example photo
+        </button>
+          </div>
+          <div id="dropzone" class="dropzone">
+            <p id="dropzoneText">Click to upload or drag & drop a photo here</p>
+            <input
+              type="file"
+              id="photoInput"
+              name="photo"
+              accept="image/*"
+              style="display:none;"
+            />
+          </div>
+      </div>
+
+        <!-- STEP 2 (MATCHED STRUCTURE) -->
+        <div class="step">
+          <span class="step-pill">STEP 2</span>
+          <div class="step-title">Animation Instructions</div>
+
+          <textarea
+            id="animationText"
+            name="animationText"
+            rows="4"
+            placeholder="Example: The two people gently look at each other and smile with natural movement that is clearly visible on video."
+            class="textarea-input"
+          ></textarea>
+
+          <!-- Prompt suggestions appear here (above the button) -->
+          <div id="promptList" style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:14px;"></div>
+
+          <div class="step-action">
+            <button id="promptBtn" type="button" class="btn-primary">
+              Get Prompt Suggestions
+            </button>
+          </div>
+
+          <p class="step-helper">
+            Please select one of the prompts above or write your own animation instructions.
+          </p>
+        </div>
+
+        <!-- Hidden: original example photo button for JS compatibility -->
+        <button id="examplePhotoBtn" type="button" style="display:none;">
+          Try with an example photo
+        </button>
+
+        <!-- STEP 3 -->
+        <div class="step step-3">
+
+          <span class="step-pill">STEP 3</span>
+
+          <div class="step-action">
+            <button id="animateButton" type="button" class="btn-primary animate-btn">
+              Animate Photo
+            </button>
+          </div>
+
+          <p class="step-description">
+            Generate your animation, then download or share it once it's ready.
+          </p>
+
+        </div>
+
+        <p id="animationError" class="status-text error" style="display:none;"></p>
+
+        </div><!-- /.steps-form -->
+
+    </form>
+
+      <!-- Status -->
+      <p id="status" class="status-text"></p>
+
+      <!-- Progress Bar -->
+      <div
+        id="progressContainer"
+        style="display:none; margin-top:10px; width:100%; height:8px; background:#e5e7eb; border-radius:999px; overflow:hidden;"
+      >
+        <div
+          id="progressBar"
+          style="width:0%; height:100%; background:var(--sa-blue); border-radius:999px; transition:width 0.5s ease-out;"
+        ></div>
+  </div>
+
+      <p id="progressLabel" class="status-text" style="display:none;"></p>
+
+      <!-- Result Video -->
+      <div id="videoWrapper" class="video-wrapper" style="display:none;">
+        <video id="resultVideo" class="result-video" controls></video>
+
+        <!-- SeeAgain logo watermark (free/dev only) -->
+        <div id="videoWatermark" class="video-watermark">
+          <img src="/watermark.png" alt="SeeAgain" class="video-watermark-logo" />
+        </div>
+      </div>
+
+      <!-- Video Actions -->
+      <div id="videoActions" class="button-row" style="display:none; margin-top:12px;">
+        <button type="button" id="downloadBtn" class="btn-outline">
+          Download Video
+        </button>
+        <button type="button" id="shareBtn" class="btn-outline">
+          Share...
+        </button>
+      </div>
+
+      <!-- STORY CARDS -->
+      <section class="story-section">
+        <div class="story-section-header">
+          <h3 class="story-section-title">Why Families Love See<span class="logo-again">Again</span></h3>
+          <p class="story-section-subtitle">Turn treasured photos into moving memories.</p>
+        </div>
+        <div class="story-cards">
+          <!-- Card 1 -->
+          <div class="story-card">
+            <div class="story-card-visual">
+              <video class="story-card-video" autoplay loop muted playsinline>
+                <source src="/gallery2/stockvideo1.mp4" type="video/mp4" />
+              </video>
+            </div>
+            <h3 class="story-card-title">Bring Your Family's Memories to Life</h3>
+            <p class="story-card-desc">Watch your photos gently move and tell the stories behind every smile, laugh, and heartfelt moment.</p>
+          </div>
+          <!-- Card 2 -->
+          <div class="story-card">
+            <div class="story-card-visual">
+              <video class="story-card-video" autoplay loop muted playsinline>
+                <source src="/gallery2/stockvideo2.mp4" type="video/mp4" />
+              </video>
+            </div>
+            <h3 class="story-card-title">Celebrate the Moments That Shape Us</h3>
+            <p class="story-card-desc">Relive the memories that define your journey, seeing the joy and meaning in every captured moment.</p>
+          </div>
+          <!-- Card 3 -->
+          <div class="story-card">
+            <div class="story-card-visual">
+              <video class="story-card-video" autoplay loop muted playsinline>
+                <source src="/gallery2/stockvideo3.mp4" type="video/mp4" />
+              </video>
+            </div>
+            <h3 class="story-card-title">Preserve Your Story for Tomorrow</h3>
+            <p class="story-card-desc">Create beautiful animated keepsakes from your photos — so your family's story lives on, moving and vibrant for years to come.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- FAQ -->
+      <section class="row faq" id="faq">
+        <div class="faq-header">
+          <h3 class="faq-title">Common Questions</h3>
+          <p class="faq-subtitle">Quick answers so you can animate with confidence.</p>
+        </div>
+
+        <div class="faq-list" role="region" aria-label="Frequently asked questions">
+          <!-- Q1 -->
+          <details class="faq-item" open>
+            <summary>
+              <span class="faq-q">Do I need any technical skills to use this?</span>
+              <span class="faq-icon" aria-hidden="true">+</span>
+            </summary>
+            <div class="faq-a">
+              Nope. If you can upload a photo, you're good to go — we keep everything simple and guided.
+            </div>
+          </details>
+
+          <!-- Q2 -->
+          <details class="faq-item">
+            <summary>
+              <span class="faq-q">How long does it take to create an animated video?</span>
+              <span class="faq-icon" aria-hidden="true">+</span>
+            </summary>
+            <div class="faq-a">
+              Usually a few minutes. If it's taking longer, just keep this tab open — you can retry if needed.
+            </div>
+          </details>
+
+          <!-- Q3 -->
+          <details class="faq-item">
+            <summary>
+              <span class="faq-q">Can I choose how the photo is animated?</span>
+              <span class="faq-icon" aria-hidden="true">+</span>
+            </summary>
+            <div class="faq-a">
+              Yes — pick a suggested prompt or write your own. Simple motion descriptions work best (blink, smile, subtle zoom, etc.).
+            </div>
+          </details>
+
+          <!-- Q4 -->
+          <details class="faq-item">
+            <summary>
+              <span class="faq-q">Is my photo safe and private?</span>
+              <span class="faq-icon" aria-hidden="true">+</span>
+            </summary>
+            <div class="faq-a">
+              We use your photo only to generate the animation. For details, see the Privacy Policy linked in the footer.
+            </div>
+          </details>
+
+          <!-- Q5 -->
+          <details class="faq-item">
+            <summary>
+              <span class="faq-q">Can I download and share the animated video?</span>
+              <span class="faq-icon" aria-hidden="true">+</span>
+            </summary>
+            <div class="faq-a">
+              Yep — once it's ready, you can download instantly and share anywhere. Free generations include a small watermark.
+            </div>
+          </details>
+
+          <!-- Q6 -->
+          <details class="faq-item">
+            <summary>
+              <span class="faq-q">Do old or scanned photos work?</span>
+              <span class="faq-icon" aria-hidden="true">+</span>
+            </summary>
+            <div class="faq-a">
+              Most of the time, yes. Best results come from clear faces, good lighting, and higher-resolution scans.
+            </div>
+          </details>
+        </div>
+      </section>
+
+      <!-- Bottom Logo -->
+      <div class="bottom-logo">
+        See<span class="logo-again">Again</span>
+      </div>
+
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+      SeeAgain ·
+      <a href="/privacy.html" style="color:#64748b; text-decoration:none;">Privacy</a>
+      ·
+      <a href="/terms.html" style="color:#64748b; text-decoration:none;">Terms</a>
+      ·
+      <a href="/contact.html" style="color:#64748b; text-decoration:none;">Contact</a>
+    </footer>
+
+  </div>
+
+  <script>
+    const animateBtn = document.getElementById("animateButton");
+    const animationError = document.getElementById("animationError");
+    const statusEl = document.getElementById("status");
+    const videoEl = document.getElementById("resultVideo");
+    const photoInput = document.getElementById("photoInput");
+    const promptBtn = document.getElementById("promptBtn");
+    const animationText = document.getElementById("animationText");
+    const dropzone = document.getElementById("dropzone");
+    const progressContainer = document.getElementById("progressContainer");
+    const progressBar = document.getElementById("progressBar");
+    const progressLabel = document.getElementById("progressLabel");
+    const dropzoneText = document.getElementById("dropzoneText");
+    const videoActions = document.getElementById("videoActions");
+    const downloadBtn = document.getElementById("downloadBtn");
+    const shareBtn = document.getElementById("shareBtn");
+    const examplePhotoBtn = document.getElementById("examplePhotoBtn");
+    const videoWrapper = document.getElementById("videoWrapper");
+    const videoWatermark = document.getElementById("videoWatermark");
+
+    // Inline "Try an example photo" link handler
+    function useExamplePhoto() {
+      if (examplePhotoBtn) examplePhotoBtn.click();
+    }
+    // Expose globally for onclick attribute
+    window.useExamplePhoto = useExamplePhoto;
+
+    // Toggle custom language menu (opens immediately to list)
+    const langBtn = document.getElementById("langToggle");
+    const langMenu = document.getElementById("langMenu");
+
+    if (langBtn && langMenu) {
+      langBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        langMenu.style.display = (langMenu.style.display === "block") ? "none" : "block";
+      });
+
+      document.addEventListener("click", (e) => {
+        if (!langMenu.contains(e.target) && !langBtn.contains(e.target)) {
+          langMenu.style.display = "none";
+        }
+      });
+    }
+
+    // Helpers to manage Google translate cookie (to reset to English)
+    function setCookie(name, value) {
+      document.cookie = name + "=" + value + ";path=/;max-age=31536000";
+    }
+    function clearCookie(name) {
+      document.cookie = name + "=;path=/;expires=Thu, 01 Jan 1970 00:00:00 GMT";
+    }
+
+    // Apply language via google translate combo, or reset to English
+    function applyLanguage(lang) {
+      // Highlight active
+      document.querySelectorAll(".lang-item").forEach(btn => {
+        btn.classList.toggle("active", btn.dataset.lang === lang);
+      });
+
+      if (lang === "en") {
+        // Reset translation: clear translate cookies and reload
+        clearCookie("googtrans");
+        document.cookie = "googtrans=;path=/;domain=" + location.hostname + ";expires=Thu, 01 Jan 1970 00:00:00 GMT";
+        location.reload();
+          return;
+        }
+
+      // Set translate cookie and trigger the hidden select if it exists
+      setCookie("googtrans", "/en/" + lang);
+
+      // Trigger the Google widget select (once available)
+      const trySelect = () => {
+        const select = document.querySelector(".goog-te-combo");
+        if (!select) return false;
+        select.value = lang;
+        select.dispatchEvent(new Event("change"));
+        return true;
+      };
+
+      if (!trySelect()) {
+        // If widget not ready yet, retry a few times quickly
+        let tries = 0;
+        const t = setInterval(() => {
+          tries++;
+          if (trySelect() || tries > 30) clearInterval(t);
+        }, 100);
+      }
+    }
+
+    // Click handler for menu buttons
+    document.querySelectorAll(".lang-item").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const lang = btn.dataset.lang;
+        applyLanguage(lang);
+        if (langMenu) langMenu.style.display = "none";
+      });
+    });
+
+    // Show watermark only for Dev / Free animations
+    function updateWatermarkVisibility(isWatermarkedOverride) {
+      if (!videoWatermark) return;
+
+      // Determine if we should show watermark
+      // Paid users = no watermark, Free users = watermark
+      const defaultShouldWatermark = !shouldHideWatermark();
+
+      const shouldWatermark =
+        typeof isWatermarkedOverride === "boolean"
+          ? isWatermarkedOverride
+          : defaultShouldWatermark;
+
+      videoWatermark.style.display = shouldWatermark ? "inline-flex" : "none";
+    }
+
+    // GALLERY LOGIC
+    const galleryItems = [
+      {
+        still: "/gallery/example1-still (1).jpg",
+        video: "/gallery/example1-video (1).mp4",
+      },
+      {
+        still: "/gallery/example2-still (1).jpg",
+        video: "/gallery/example2-video (1).mp4",
+      },
+      {
+        still: "/gallery/example3-still (1).jpg",
+        video: "/gallery/example3-video (1).mp4",
+      },
+      {
+        still: "/gallery/example4-still (1).jpg",
+        video: "/gallery/example4-video (1).mp4",
+      },
+      {
+        still: "/gallery/example5-still (1).jpg",
+        video: "/gallery/example5-video (1).mp4",
+      },
+    ];
+
+    const galleryStillEl = document.getElementById("gallery-still");
+    const galleryVideoEl = document.getElementById("gallery-video");
+    const galleryPrevBtn = document.getElementById("gallery-prev");
+    const galleryNextBtn = document.getElementById("gallery-next");
+    const galleryRow = document.querySelector(".gallery-row");
+
+    let galleryIndex = 0;
+    let isGalleryAnimating = false;
+
+    function renderGalleryItem(index) {
+      const item = galleryItems[index];
+      if (!item) return;
+
+      galleryStillEl.src = item.still;
+      galleryVideoEl.src = item.video;
+
+      // restart video playback on change
+      galleryVideoEl.pause();
+      galleryVideoEl.load();
+      galleryVideoEl.play().catch(() => {});
+    }
+
+    /**
+     * Smooth slide + fade transition helper.
+     * direction: +1 for "next", -1 for "previous"
+     */
+    function animateGalleryChange(nextIndex, direction) {
+      if (!galleryRow) {
+        galleryIndex = nextIndex;
+        renderGalleryItem(galleryIndex);
+          return;
+        }
+
+      if (isGalleryAnimating) return;
+      isGalleryAnimating = true;
+
+      const dirClass = direction > 0 ? "gallery-to-left" : "gallery-to-right";
+
+      // Phase 1: slide/fade out
+      galleryRow.classList.add(dirClass);
+
+      // Halfway through the animation, swap content
+      setTimeout(() => {
+        galleryIndex = nextIndex;
+        renderGalleryItem(galleryIndex);
+
+        // Phase 2: remove class so it slides/fades back in
+        galleryRow.classList.remove(dirClass);
+
+        // After animation finishes, unlock
+        setTimeout(() => {
+          isGalleryAnimating = false;
+        }, 450);
+      }, 220);
+    }
+
+    if (galleryPrevBtn && galleryNextBtn && galleryStillEl && galleryVideoEl) {
+      // Arrow click handlers
+      galleryPrevBtn.addEventListener("click", () => {
+        const nextIndex =
+          (galleryIndex - 1 + galleryItems.length) % galleryItems.length;
+        animateGalleryChange(nextIndex, -1);
+      });
+
+      galleryNextBtn.addEventListener("click", () => {
+        const nextIndex = (galleryIndex + 1) % galleryItems.length;
+        animateGalleryChange(nextIndex, +1);
+      });
+
+      // Basic swipe support for mobile
+      if (galleryRow) {
+        let touchStartX = 0;
+        let touchEndX = 0;
+        const SWIPE_THRESHOLD = 40; // px
+
+        galleryRow.addEventListener("touchstart", (e) => {
+          if (!e.touches || e.touches.length === 0) return;
+          touchStartX = e.touches[0].clientX;
+        });
+
+        galleryRow.addEventListener("touchend", (e) => {
+          const touch = (e.changedTouches && e.changedTouches[0]) || e.touches[0];
+          if (!touch) return;
+
+          touchEndX = touch.clientX;
+          const deltaX = touchEndX - touchStartX;
+
+          if (Math.abs(deltaX) < SWIPE_THRESHOLD) return;
+
+          if (deltaX < 0) {
+            // swipe left → next
+            const nextIndex = (galleryIndex + 1) % galleryItems.length;
+            animateGalleryChange(nextIndex, +1);
+          } else {
+            // swipe right → previous
+            const nextIndex =
+              (galleryIndex - 1 + galleryItems.length) % galleryItems.length;
+            animateGalleryChange(nextIndex, -1);
+          }
+        });
+      }
+
+      // initial load
+      renderGalleryItem(galleryIndex);
+    }
+
+    const DEV_MODE =
+      window.location.hostname === "localhost" ||
+      window.location.hostname === "127.0.0.1";
+
+    // Store current image as base64 for prompt suggestions
+    let currentImageBase64 = null;
+
+    // ---- FREE / PAID LOGIC ----
+    function canGenerateFree() {
+      const freeCount = Number(localStorage.getItem("free_generations") || "0");
+      const isPaid = localStorage.getItem("paid") === "true";
+      return isPaid || freeCount < 1;
+    }
+
+    function incrementFreeGeneration() {
+      const freeCount = Number(localStorage.getItem("free_generations") || "0");
+      localStorage.setItem("free_generations", String(freeCount + 1));
+    }
+
+    function shouldHideWatermark() {
+      return localStorage.getItem("paid") === "true";
+    }
+
+    function isPaidUser() {
+      return localStorage.getItem("paid") === "true";
+    }
+
+    function updateButtonLabel() {
+      if (isPaidUser()) {
+        animateBtn.textContent = "Animate Photo";
+      } else if (canGenerateFree()) {
+        animateBtn.textContent = "Animate Photo";
+      } else {
+        animateBtn.textContent = "Animate Photo ($4.99)";
+      }
+    }
+
+    function updateAnimateButtonLabelFromStorage() {
+      updateButtonLabel();
+    }
+
+    updateButtonLabel();
+
+    const promptList = document.getElementById("promptList");
+
+    function clearPromptSelection() {
+      const buttons = promptList.querySelectorAll("button");
+      buttons.forEach(btn => btn.classList.remove("prompt-selected"));
+    }
+
+    // ---- PROMPT SUGGESTIONS ----
+    promptBtn.addEventListener("click", async () => {
+      if (!currentImageBase64) {
+        alert("Please upload a photo first.");
+          return;
+        }
+
+      // Disable button + show loading text
+      const originalText = promptBtn.textContent;
+      promptBtn.textContent = "Getting Prompt Suggestions...";
+      promptBtn.disabled = true;
+      promptBtn.classList.add("loading");
+
+      try {
+        const res = await fetch("/suggest-prompts", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ imageBase64: currentImageBase64 }),
+        });
+
+        if (!res.ok) {
+          throw new Error("Failed to fetch prompt suggestions");
+        }
+
+        const data = await res.json();
+
+        // Clear old prompt option buttons
+        promptList.innerHTML = "";
+
+        // Add new prompt suggestion buttons
+        if (data.suggestions && Array.isArray(data.suggestions)) {
+          data.suggestions.forEach((s, index) => {
+            const btn = document.createElement("button");
+            // Make sure this does NOT submit the form
+            btn.type = "button";
+            btn.className = "btn-outline";
+            btn.textContent = s;
+            btn.addEventListener("click", (e) => {
+              // Extra safety so no default form action happens
+              e.preventDefault();
+              clearPromptSelection();
+              btn.classList.add("prompt-selected");
+              animationText.value = s;
+            });
+            promptList.appendChild(btn);
+
+            // ✅ Auto-select + highlight first suggestion
+            if (index === 0) {
+              btn.classList.add("prompt-selected");
+              animationText.value = s;
+            }
+          });
+        }
+
+      } catch (err) {
+        alert("Something went wrong fetching suggestions.");
+        console.error(err);
+
+      } finally {
+        // Restore button state
+        promptBtn.textContent = originalText;
+        promptBtn.disabled = false;
+        promptBtn.classList.remove("loading");
+      }
+    });
+
+    // ---- PROGRESS BAR HELPER ----
+    let progressValue = 0;
+    let progressIntervalId = null;
+
+    function setProgress(value, statusText) {
+      progressValue = Math.max(0, Math.min(100, value));
+      progressContainer.style.display = "block";
+      progressLabel.style.display = "block";
+      progressBar.style.width = progressValue + "%";
+
+      if (statusText) {
+        statusEl.textContent = statusText;
+      }
+
+      progressLabel.textContent = Math.round(progressValue) + "%";
+    }
+
+    // Store latest video URL for download
+    let latestVideoUrl = null;
+
+    // ---- GENERATE ANIMATION ----
+    async function generateAnimation(options = {}) {
+      const { isWatermarked = true } = options;
+      // hideWatermark is the OPPOSITE of isWatermarked (sent to server)
+      const hideWatermark = !isWatermarked;
+      const prompt = animationText.value.trim();
+
+      if (!currentImageBase64) {
+        alert("Please upload a photo first.");
+        throw new Error("No photo");
+      }
+
+      if (!prompt) {
+        alert("Please enter animation instructions or pick a prompt.");
+        throw new Error("No prompt");
+      }
+
+      // ✅ Issue #2: Soft guardrail for prompts that often produce "no motion"
+      // (We do NOT block. We just warn + let them continue.)
+      const promptLower = prompt.toLowerCase();
+
+      const abstractWords = [
+        "feel", "feels", "feeling",
+        "emotion", "emotions", "emotional",
+        "vibe", "nostalgia", "memory", "moment",
+        "beautiful", "meaningful", "love", "happy", "sad"
+      ];
+
+      const motionKeywords = [
+        "blink", "blinks", "blinked",
+        "smile", "smiles", "smiled",
+        "look", "looks", "looked", "gaze",
+        "head", "nod", "tilt",
+        "breathe", "breathing",
+        "shift", "adjust", "turn", "lean"
+      ];
+
+      const containsAbstract = abstractWords.some(w => promptLower.includes(w));
+      const containsMotion = motionKeywords.some(w => promptLower.includes(w));
+      const veryShort = promptLower.length < 18;
+
+      // If prompt is abstract OR very short AND lacks motion words, warn
+      const likelyTooWeak = (containsAbstract || veryShort) && !containsMotion;
+
+      if (likelyTooWeak) {
+        const ok = confirm(
+          "This prompt may be too abstract or subtle to animate clearly.\n\n" +
+          "Tip: include a visible action like a full blink, a small head tilt, or a clear eye movement.\n\n" +
+          "Continue anyway?"
+        );
+        if (!ok) {
+          throw new Error("Prompt too abstract (user canceled)");
+        }
+      }
+
+      // Reset UI before starting
+      if (videoWrapper) videoWrapper.style.display = "none";
+      videoEl.style.display = "none";
+      videoActions.style.display = "none";
+      statusEl.textContent = "";
+
+      // Stage 1
+      setProgress(5, "Uploading photo...");
+
+      // Stage 2
+      setProgress(20, "Submitting job to animation model...");
+
+      // Slow, steady progress toward 90% over ~4.5 minutes
+      if (progressIntervalId) clearInterval(progressIntervalId);
+
+      const totalMs = 4.5 * 60 * 1000; // 4.5 minutes
+      const stepMs = 5000;            // update every 5 seconds
+      const steps = totalMs / stepMs;
+      const baseIncrement = 70 / steps; // 20% → 90% = 70 percentage points
+
+      progressIntervalId = setInterval(() => {
+        if (progressValue < 90) {
+          const jitter = (Math.random() - 0.5) * baseIncrement;
+          setProgress(
+            progressValue + baseIncrement + jitter,
+            "Rendering animation..."
+          );
+        }
+      }, stepMs);
+
+      try {
+        const res = await fetch("/animate_photo", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            imageBase64: currentImageBase64,
+            prompt,
+            hideWatermark,
+          }),
+        });
+
+        if (!res.ok) {
+          const txt = await res.text();
+          console.error("Animation error:", res.status, txt);
+          throw new Error("Animation failed");
+        }
+
+        // Stage 3
+        setProgress(Math.max(progressValue, 90), "Finalizing animation...");
+
+        const data = await res.json();
+
+        if (!data.videoUrl) {
+          throw new Error("No videoUrl returned from server");
+        }
+
+        // Stage 4
+        setProgress(100, "Done!");
+
+        // Store for download
+        latestVideoUrl = data.videoUrl;
+
+        videoEl.src = data.videoUrl;
+
+        if (videoWrapper) videoWrapper.style.display = "block";
+        videoEl.style.display = "block";
+        videoActions.style.display = "flex";
+
+        // Show or hide the on-page SeeAgain logo watermark overlay
+        // (The baked watermark in the MP4 is controlled by hideWatermark sent to server)
+        updateWatermarkVisibility(isWatermarked);
+      } finally {
+        if (progressIntervalId) {
+          clearInterval(progressIntervalId);
+          progressIntervalId = null;
+        }
+
+        setTimeout(() => {
+          statusEl.textContent = "";
+          progressContainer.style.display = "none";
+          progressLabel.style.display = "none";
+        }, 2500);
+      }
+    }
+
+    // ---- STRIPE CHECKOUT ----
+    async function startCheckout() {
+      statusEl.textContent = "Redirecting to secure checkout...";
+      const res = await fetch("/create-checkout-session", {
+        method: "POST",
+      });
+
+      if (!res.ok) {
+        const txt = await res.text();
+        console.error("Checkout error:", res.status, txt);
+        statusEl.textContent = "Unable to start checkout.";
+          return;
+        }
+
+      const data = await res.json();
+      window.location.href = data.url;
+    }
+
+    async function startStripeCheckout() {
+      // Save pending animation data before redirecting to checkout
+      const pendingData = {
+        imageBase64: currentImageBase64,
+        prompt: animationText.value,
+        timestamp: Date.now()
+      };
+      localStorage.setItem("pendingAnimation", JSON.stringify(pendingData));
+
+      const res = await fetch("/create-checkout-session", {
+        method: "POST",
+      });
+
+      if (!res.ok) {
+        throw new Error("Could not start checkout. Please try again.");
+      }
+
+      const data = await res.json();
+      if (!data.url) {
+        throw new Error("Checkout URL missing. Please try again.");
+      }
+
+      window.location.href = data.url;
+    }
+
+    // ---- BUTTON CLICK HANDLER ----
+    animateBtn.addEventListener("click", async () => {
+      animationError.style.display = "none";
+      animationError.textContent = "";
+
+      const originalText = animateBtn.textContent;
+
+      try {
+        // Check if user can generate (paid OR has free generations left)
+        if (canGenerateFree()) {
+          animateBtn.disabled = true;
+          animateBtn.textContent =
+            "Please keep this tab open while your animation is generating (up to 5 minutes).";
+
+          // Paid users get no watermark, free users get watermark
+          const hideWatermark = shouldHideWatermark();
+          await generateAnimation({ isWatermarked: !hideWatermark });
+
+          // If this was a free generation, increment the counter
+          if (!isPaidUser()) {
+            incrementFreeGeneration();
+          }
+          
+          updateAnimateButtonLabelFromStorage();
+        } else {
+          // User has used their free generation and hasn't paid
+          animateBtn.disabled = true;
+          animateBtn.textContent = "Redirecting to checkout...";
+          await startStripeCheckout();
+        }
+      } catch (err) {
+        console.error(err);
+        animateBtn.textContent = originalText;
+
+        if (!canGenerateFree()) {
+          // Most likely a checkout / payment issue
+          animationError.textContent =
+            err?.message || "Unable to start checkout. Please try again.";
+        } else {
+          // Most likely an animation/API issue
+          animationError.textContent =
+            "Animation didn't generate — click 'Animate Photo' to retry.";
+        }
+
+        animationError.style.display = "block";
+
+        // Clean up progress UI so they can retry cleanly
+        statusEl.textContent = "";
+        progressContainer.style.display = "none";
+        progressLabel.style.display = "none";
+        progressBar.style.width = "0%";
+      } finally {
+        animateBtn.disabled = false;
+      }
+    });
+
+    updateAnimateButtonLabelFromStorage();
+    updateWatermarkVisibility();
+
+    // ---- CHECK FOR POST-PAYMENT ANIMATION ----
+    // If returning from successful Stripe checkout, auto-generate the animation
+    (async function checkPendingAnimation() {
+      const urlParams = new URLSearchParams(window.location.search);
+      const paymentStatus = urlParams.get("payment");
+
+      // Handle cancelled payment
+      if (paymentStatus === "cancelled") {
+        window.history.replaceState({}, document.title, window.location.pathname);
+        localStorage.removeItem("pendingAnimation");
+        statusEl.textContent = "Payment was cancelled. Your photo and prompt are still saved.";
+        return;
+      }
+
+      if (paymentStatus !== "success") return;
+
+      // Clear the URL parameter
+      window.history.replaceState({}, document.title, window.location.pathname);
+
+      // Get pending animation data
+      const pendingDataStr = localStorage.getItem("pendingAnimation");
+      if (!pendingDataStr) {
+        console.warn("Payment successful but no pending animation data found.");
+        return;
+      }
+
+      try {
+        const pendingData = JSON.parse(pendingDataStr);
+        
+        // Check if data is still fresh (within 30 minutes)
+        if (Date.now() - pendingData.timestamp > 30 * 60 * 1000) {
+          console.warn("Pending animation data expired.");
+          localStorage.removeItem("pendingAnimation");
+          return;
+        }
+
+        // Restore the data
+        currentImageBase64 = pendingData.imageBase64;
+        animationText.value = pendingData.prompt;
+        dropzoneText.textContent = "Photo restored from checkout";
+
+        // Clear pending data
+        localStorage.removeItem("pendingAnimation");
+
+        // Mark user as paid (this was set by success page, but ensure it's set)
+        localStorage.setItem("paid", "true");
+        localStorage.removeItem("free_generations");
+
+        // Auto-trigger the animation (without watermark since they paid!)
+        animateBtn.disabled = true;
+        animateBtn.textContent = "Please keep this tab open while your animation is generating (up to 5 minutes).";
+        statusEl.textContent = "Payment confirmed!";
+
+        await generateAnimation({ isWatermarked: false });
+
+        animateBtn.textContent = "Animate Photo";
+        animateBtn.disabled = false;
+
+      } catch (err) {
+        console.error("Error processing post-payment animation:", err);
+        localStorage.removeItem("pendingAnimation");
+        animationError.textContent = "Animation failed after payment. Please try again or contact support.";
+        animationError.style.display = "block";
+        animateBtn.disabled = false;
+        updateAnimateButtonLabelFromStorage();
+      }
+    })();
+
+    // Drag-and-drop upload behavior
+    if (dropzone) {
+      dropzone.addEventListener("click", () => {
+        photoInput.click();
+      });
+
+      dropzone.addEventListener("dragover", (e) => {
+        e.preventDefault();
+        dropzone.classList.add("dragover");
+      });
+
+      dropzone.addEventListener("dragleave", (e) => {
+        e.preventDefault();
+        dropzone.classList.remove("dragover");
+      });
+
+      dropzone.addEventListener("drop", (e) => {
+        e.preventDefault();
+        dropzone.classList.remove("dragover");
+
+        const file = e.dataTransfer.files && e.dataTransfer.files[0];
+        if (file) {
+          photoInput.files = e.dataTransfer.files;
+          dropzoneText.textContent = file.name;
+
+          // Convert to base64 for prompt suggestions
+          const reader = new FileReader();
+          reader.onload = () => {
+            const result = reader.result || "";
+            const commaIndex = result.indexOf(",");
+            currentImageBase64 = commaIndex >= 0 ? result.slice(commaIndex + 1) : result;
+          };
+          reader.readAsDataURL(file);
+        }
+      });
+
+      photoInput.addEventListener("change", () => {
+        const file = photoInput.files[0];
+        dropzoneText.textContent = file
+          ? file.name
+          : "Click to upload or drag & drop a photo here";
+        
+        // Convert file to base64 for prompt suggestions
+        if (file) {
+          const reader = new FileReader();
+          reader.onload = () => {
+            const result = reader.result || "";
+            const commaIndex = result.indexOf(",");
+            currentImageBase64 = commaIndex >= 0 ? result.slice(commaIndex + 1) : result;
+          };
+          reader.readAsDataURL(file);
+        } else {
+          currentImageBase64 = null;
+        }
+      });
+    }
+
+    // Download video
+    function showToast(message) {
+      const toast = document.createElement("div");
+      toast.textContent = message;
+
+      toast.style.position = "fixed";
+      toast.style.bottom = "30px";
+      toast.style.left = "50%";
+      toast.style.transform = "translateX(-50%)";
+
+      // Brand style
+      toast.style.background = "var(--sa-blue)";
+      toast.style.color = "#ffffff";
+      toast.style.padding = "12px 20px";
+      toast.style.borderRadius = "14px";
+      toast.style.fontSize = "14px";
+      toast.style.fontWeight = "600";
+      toast.style.letterSpacing = "0.01em";
+      toast.style.boxShadow = "0 10px 35px rgba(55, 97, 226, 0.35)";
+      toast.style.zIndex = "9999";
+
+      toast.style.opacity = "0";
+      toast.style.transition = "opacity 0.35s ease";
+
+      document.body.appendChild(toast);
+
+      // Fade in
+      requestAnimationFrame(() => {
+        toast.style.opacity = "1";
+      });
+
+      // Fade out + cleanup
+      setTimeout(() => {
+        toast.style.opacity = "0";
+        setTimeout(() => {
+          document.body.removeChild(toast);
+        }, 400);
+      }, 2500);
+    }
+
+    // Download helper - fetches and triggers immediate download without navigation
+    async function downloadFile(url, filename = "seeagain.mp4") {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error("Download failed");
+      const blob = await res.blob();
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(a.href);
+    }
+
+    if (downloadBtn) {
+      downloadBtn.addEventListener("click", async (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+
+        // Use latestVideoUrl (set when animation completes) or fall back to videoEl.src
+        const videoUrl = latestVideoUrl || videoEl.src;
+        if (!videoUrl) return;
+
+        try {
+          await downloadFile(videoUrl, "seeagain-animation.mp4");
+          showToast("Video downloaded");
+        } catch (err) {
+          console.error("Download failed:", err);
+          showToast("Download failed — try again");
+        }
+      });
+    }
+
+    // Share video (or copy link as fallback)
+    if (shareBtn) {
+      shareBtn.addEventListener("click", async () => {
+        if (!videoEl.src) return;
+
+        try {
+          if (navigator.share) {
+            await navigator.share({
+              title: "Animated memory from SeeAgain",
+              text: "I just brought this old photo to life with SeeAgain.",
+              url: videoEl.src,
+            });
+          } else if (navigator.clipboard && navigator.clipboard.writeText) {
+            await navigator.clipboard.writeText(videoEl.src);
+            alert("Video link copied to clipboard!");
+          } else {
+            alert("Sharing is not supported in this browser.");
+          }
+        } catch (err) {
+          console.error("Share failed:", err);
+        }
+      });
+    }
+
+    // Try with example photo
+    if (examplePhotoBtn) {
+      examplePhotoBtn.addEventListener("click", async () => {
+        try {
+          const res = await fetch("/sample-photo.jpg");
+          if (!res.ok) {
+            alert("Example photo not found. Make sure sample-photo.jpg is in the public folder.");
+            return;
+          }
+
+          const blob = await res.blob();
+          const reader = new FileReader();
+
+          reader.onloadend = () => {
+            const dataUrl = reader.result;
+            const base64 = dataUrl.split(",")[1];
+
+            // Store in shared state so prompts + animation both work
+            currentImageBase64 = base64;
+
+            // Also set the file input so animate photo can read it
+            const file = new File([blob], "sample-photo.jpg", { type: blob.type });
+            const dataTransfer = new DataTransfer();
+            dataTransfer.items.add(file);
+            photoInput.files = dataTransfer.files;
+
+            // Update UI
+            if (dropzoneText) {
+              dropzoneText.textContent = "sample-photo.jpg (example)";
+            }
+          };
+
+          reader.readAsDataURL(blob);
+        } catch (err) {
+          console.error("Failed to load example photo", err);
+          alert("Unable to load example photo.");
+        }
+      });
+    }
+
+    // FAQ: allow multiple open + keep icon state correct (details/summary handles open/close)
+    // This script just ensures the + icon exists even if DOM changes later.
+    (function () {
+      const items = Array.from(document.querySelectorAll("#faq .faq-item"));
+      items.forEach((item) => {
+        const summary = item.querySelector("summary");
+        if (!summary) return;
+        // Ensure there's a .faq-icon present
+        let icon = summary.querySelector(".faq-icon");
+        if (!icon) {
+          icon = document.createElement("span");
+          icon.className = "faq-icon";
+          icon.setAttribute("aria-hidden", "true");
+          icon.textContent = "+";
+          summary.appendChild(icon);
+        }
+      });
+    })();
+  </script>
+
+  <!-- Google Translate -->
+  <script src="//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"></script>
+  <script>
+    function googleTranslateElementInit() {
+      new google.translate.TranslateElement(
+        {
+          pageLanguage: "en",
+          includedLanguages: "en,es,fr,de,it,pt,pt-BR,ru,uk,ro,el,hu,pl,ar,bg,no,da,sk",
+          autoDisplay: false
+        },
+        "google_translate_element"
+      );
+    }
+  </script>
+</body>
+</html>

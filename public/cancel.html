@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>SeeAgain — Payment Canceled</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+      :root {
+        --sa-blue: #3761e2;
+      }
+      body {
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+          sans-serif;
+        background: radial-gradient(circle at top right, #e0ffe9 0, #f8fafc 45%, #f9fafb 100%);
+        color: #111827;
+        margin: 0;
+        min-height: 100vh;
+        padding: 24px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .card {
+        background: #ffffff;
+        max-width: 480px;
+        width: 100%;
+        padding: 32px 28px;
+        border-radius: 24px;
+        box-shadow: 0 18px 45px rgba(15, 23, 42, 0.15);
+        text-align: center;
+      }
+
+      .logo {
+        font-size: 28px;
+        font-weight: 800;
+        letter-spacing: -0.03em;
+        margin-bottom: 16px;
+      }
+      .logo span {
+        color: var(--sa-blue);
+      }
+
+      h1 {
+        font-size: 22px;
+        margin: 0 0 8px;
+      }
+
+      p {
+        margin: 6px 0;
+        font-size: 15px;
+        color: #475569;
+      }
+
+      .pill {
+        display: inline-block;
+        padding: 6px 14px;
+        border-radius: 999px;
+        font-size: 13px;
+        font-weight: 600;
+        background: #fef2f2;
+        color: #b91c1c;
+        margin-bottom: 16px;
+      }
+
+      a.button-link {
+        margin-top: 20px;
+        display: inline-block;
+        padding: 12px 24px;
+        border-radius: 999px;
+        border: none;
+        background: var(--sa-blue);
+        color: #ffffff;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        text-decoration: none;
+        transition: background 0.15s ease;
+      }
+
+      a.button-link:hover {
+        background: #2a4fc9;
+      }
+
+      .subtle {
+        font-size: 13px;
+        color: #64748b;
+        margin-top: 16px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <div class="logo">See<span>Again</span></div>
+      <div class="pill">Payment canceled</div>
+      <h1>No worries!</h1>
+      <p>No charge was made. Your photo and prompt are still saved.</p>
+      <p>You can try again whenever you're ready.</p>
+
+      <a href="/?payment=cancelled" class="button-link">Back to SeeAgain</a>
+
+      <p class="subtle">
+        Your first animation is still free if you haven't used it yet.
+      </p>
+    </div>
+  </body>
+</html>

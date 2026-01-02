@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>SeeAgain — Payment Successful</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+      :root {
+        --sa-blue: #3761e2;
+      }
+      body {
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+          sans-serif;
+        background: radial-gradient(circle at top right, #e0ffe9 0, #f8fafc 45%, #f9fafb 100%);
+        color: #111827;
+        margin: 0;
+        min-height: 100vh;
+        padding: 24px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .card {
+        background: #ffffff;
+        max-width: 480px;
+        width: 100%;
+        padding: 32px 28px;
+        border-radius: 24px;
+        box-shadow: 0 18px 45px rgba(15, 23, 42, 0.15);
+        text-align: center;
+      }
+
+      .logo {
+        font-size: 28px;
+        font-weight: 800;
+        letter-spacing: -0.03em;
+        margin-bottom: 16px;
+      }
+      .logo span {
+        color: var(--sa-blue);
+      }
+
+      h1 {
+        font-size: 22px;
+        margin: 0 0 8px;
+      }
+
+      p {
+        margin: 6px 0;
+        font-size: 15px;
+        color: #475569;
+      }
+
+      .pill {
+        display: inline-block;
+        padding: 6px 14px;
+        border-radius: 999px;
+        font-size: 13px;
+        font-weight: 600;
+        background: #ecfdf5;
+        color: #166534;
+        margin-bottom: 16px;
+      }
+
+      .loading {
+        margin-top: 20px;
+        font-size: 14px;
+        color: #64748b;
+      }
+
+      .spinner {
+        display: inline-block;
+        width: 18px;
+        height: 18px;
+        border: 2px solid #e5e7eb;
+        border-top-color: var(--sa-blue);
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+        vertical-align: middle;
+        margin-right: 8px;
+      }
+
+      @keyframes spin {
+        to { transform: rotate(360deg); }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <div class="logo">See<span>Again</span></div>
+      <div class="pill">✓ Payment successful</div>
+      <h1>Thank you!</h1>
+      <p>Your payment went through. You now have unlimited watermark-free animations.</p>
+      
+      <p class="loading">
+        <span class="spinner"></span>
+        Redirecting to generate your animation...
+      </p>
+    </div>
+
+    <script>
+      // Mark user as paid
+      localStorage.setItem("paid", "true");
+      
+      // Clear free generation counter
+      localStorage.removeItem("free_generations");
+
+      // Redirect back to main app with success flag
+      setTimeout(() => {
+        window.location.href = "/?payment=success";
+      }, 1500);
+    </script>
+  </body>
+</html>
+
