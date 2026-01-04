@@ -1004,6 +1004,21 @@
       justify-content: center;
       gap: 12px;
     }
+    #saveToPhotosBtn {
+      min-width: 140px;
+    }
+    @media (max-width: 480px) {
+      #videoActions > div {
+        width: 100%;
+      }
+      #saveToPhotosBtn,
+      #downloadBtn {
+        flex: 1;
+        min-width: 0;
+        padding: 10px 14px;
+        font-size: 13px;
+      }
+    }
 
     /* ===============================
        VIDEO + WATERMARK FIX
@@ -1762,13 +1777,18 @@
       </div>
 
       <!-- Video Actions -->
-      <div id="videoActions" class="button-row" style="display:none; margin-top:12px;">
-        <button type="button" id="downloadBtn" class="btn-outline">
-          Download Video
-        </button>
-        <button type="button" id="shareBtn" class="btn-outline">
-          Share...
-        </button>
+      <div id="videoActions" class="button-row" style="display:none; margin-top:12px; flex-direction:column; align-items:center; gap:10px;">
+        <div style="display:flex; gap:12px; justify-content:center; flex-wrap:wrap;">
+          <button type="button" id="saveToPhotosBtn" class="btn-primary">
+            Save to Photos
+          </button>
+          <button type="button" id="downloadBtn" class="btn-outline">
+            Download MP4
+          </button>
+        </div>
+        <p id="saveToPhotosHint" style="margin:0; font-size:12px; color:#64748b; text-align:center;">
+          On iPhone: tap Share, then "Save Video"
+        </p>
       </div>
 
       <!-- STORY CARDS -->
@@ -1921,7 +1941,8 @@
     const dropzoneText = document.getElementById("dropzoneText");
     const videoActions = document.getElementById("videoActions");
     const downloadBtn = document.getElementById("downloadBtn");
-    const shareBtn = document.getElementById("shareBtn");
+    const saveToPhotosBtn = document.getElementById("saveToPhotosBtn");
+    const saveToPhotosHint = document.getElementById("saveToPhotosHint");
     const examplePhotoBtn = document.getElementById("examplePhotoBtn");
     const videoWrapper = document.getElementById("videoWrapper");
     const videoWatermark = document.getElementById("videoWatermark");
@@ -2283,8 +2304,9 @@
       progressLabel.textContent = Math.round(progressValue) + "%";
     }
 
-    // Store latest video URL for download
+    // Store latest video URLs for download/share
     let latestVideoUrl = null;
+    let latestDownloadUrl = null;
 
     // ---- GENERATE ANIMATION ----
     async function generateAnimation(options = {}) {
@@ -2402,8 +2424,9 @@
         // Stage 4
         setProgress(100, "Done!");
 
-        // Store for download
+        // Store for download/share
         latestVideoUrl = data.videoUrl;
+        latestDownloadUrl = data.downloadUrl || data.videoUrl;
 
         videoEl.src = data.videoUrl;
 
@@ -2709,26 +2732,83 @@
       URL.revokeObjectURL(a.href);
     }
 
+    // ---- SAVE TO PHOTOS (iOS Share Sheet) ----
+    if (saveToPhotosBtn) {
+      saveToPhotosBtn.addEventListener("click", async (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+
+        const videoUrl = latestDownloadUrl || latestVideoUrl || videoEl.src;
+        if (!videoUrl) return;
+
+        try {
+          // Check if Web Share API supports files
+          if (navigator.canShare && navigator.share) {
+            // Fetch the video as a blob
+            const response = await fetch(videoUrl);
+            if (!response.ok) throw new Error("Failed to fetch video");
+            
+            const blob = await response.blob();
+            const file = new File([blob], "SeeAgain-animation.mp4", { type: "video/mp4" });
+
+            // Check if we can share files
+            if (navigator.canShare({ files: [file] })) {
+              await navigator.share({
+                files: [file],
+                title: "SeeAgain Animation",
+                text: "Save this video to your Photos"
+              });
+              showToast("Shared successfully!");
+              return;
+            }
+          }
+
+          // Fallback: Open video in new tab (iOS user can tap Share → Save Video)
+          window.open(videoUrl, "_blank", "noopener,noreferrer");
+          showToast("Tap Share → Save Video");
+
+        } catch (err) {
+          // User cancelled share or share failed
+          if (err.name === "AbortError") {
+            // User cancelled - that's fine
+            return;
+          }
+          console.error("Save to Photos failed:", err);
+          // Fallback: open in new tab
+          window.open(videoUrl, "_blank", "noopener,noreferrer");
+          showToast("Tap Share → Save Video");
+        }
+      });
+    }
+
+    // ---- DOWNLOAD MP4 ----
     if (downloadBtn) {
       downloadBtn.addEventListener("click", async (e) => {
         e.preventDefault();
         e.stopPropagation();
 
-        // Use latestVideoUrl (set when animation completes) or fall back to videoEl.src
-        const videoUrl = latestVideoUrl || videoEl.src;
+        const videoUrl = latestDownloadUrl || latestVideoUrl || videoEl.src;
         if (!videoUrl) return;
 
         try {
-          await downloadFile(videoUrl, "seeagain-animation.mp4");
+          await downloadFile(videoUrl, "SeeAgain-animation.mp4");
           showToast("Video downloaded");
         } catch (err) {
           console.error("Download failed:", err);
-          showToast("Download failed — try again");
+          // Fallback: open in new tab
+          window.open(videoUrl, "_blank", "noopener,noreferrer");
+          showToast("Right-click to save video");
         }
       });
     }
 
-    // Share video (or copy link as fallback)
+    // Hide hint on desktop (only show on touch devices)
+    if (saveToPhotosHint && !('ontouchstart' in window)) {
+      saveToPhotosHint.style.display = "none";
+    }
+
+    // Legacy share button handler (kept for compatibility)
+    const shareBtn = document.getElementById("shareBtn");
     if (shareBtn) {
       shareBtn.addEventListener("click", async () => {
         if (!videoEl.src) return;

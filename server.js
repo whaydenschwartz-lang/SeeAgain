@@ -34,6 +34,48 @@ app.use(formData.parse());
 app.use(express.json({ limit: '20mb' }));
 app.use(express.static(path.join(__dirname, "public")));
 
+// ---- STREAMING DOWNLOAD ROUTE (for iOS Save to Photos) ----
+app.get("/api/download/:filename", (req, res) => {
+  try {
+    // Sanitize filename to prevent path traversal
+    const filename = path.basename(req.params.filename);
+    
+    // Only allow .mp4 files from outputs directory
+    if (!filename.endsWith(".mp4")) {
+      return res.status(400).send("Invalid file type");
+    }
+    
+    const filePath = path.join(__dirname, "public", "outputs", filename);
+    
+    // Check file exists
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).send("File not found");
+    }
+    
+    const stat = fs.statSync(filePath);
+    
+    // Set headers for download
+    res.setHeader("Content-Type", "video/mp4");
+    res.setHeader("Content-Length", stat.size);
+    res.setHeader("Content-Disposition", `attachment; filename="SeeAgain-animation.mp4"`);
+    res.setHeader("Cache-Control", "no-cache");
+    
+    // Stream the file (memory efficient)
+    const readStream = fs.createReadStream(filePath);
+    readStream.pipe(res);
+    
+    readStream.on("error", (err) => {
+      console.error("Stream error:", err);
+      if (!res.headersSent) {
+        res.status(500).send("Error streaming file");
+      }
+    });
+  } catch (err) {
+    console.error("Download route error:", err);
+    res.status(500).send("Download failed");
+  }
+});
+
 // ---- WATERMARK HELPERS ----
 function ensureDir(dirPath) {
   if (!fs.existsSync(dirPath)) fs.mkdirSync(dirPath, { recursive: true });
@@ -377,6 +419,7 @@ app.post("/animate_photo", async (req, res) => {
     return res.json({
       ok: true,
       videoUrl: `/outputs/${finalFilename}`,
+      downloadUrl: `/api/download/${finalFilename}`,
       watermarked: wasWatermarked
     });
 
