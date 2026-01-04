@@ -574,12 +574,14 @@
     }
     .upload-title {
       font-weight: 800;
-      font-size: 16px;
+      font-size: 22px;
       color: #0f172a;
+      line-height: 1.15;
     }
-    .upload-or {
-      font-size: 14px;
-      color: #64748b;
+    .upload-label {
+      flex-direction: column !important;
+      align-items: flex-start !important;
+      gap: 6px !important;
     }
     .example-photo-inline {
       background: none;
@@ -626,7 +628,7 @@
     .step-label {
       display: flex;
       align-items: center;
-      margin-bottom: 6px;
+      margin-bottom: 10px;
     }
     /* Make STEP pills bigger + more "premium" */
     .step-pill {
@@ -783,20 +785,26 @@
 
     /* ===== STEP SECTION SPACING + BIGGER PILLS/TEXT + CLEAN BUTTON/TEXT SEPARATION ===== */
 
-    /* Overall step block spacing */
+    /* Overall step block spacing — uniform gaps */
     .step {
-      margin-top: 28px;
+      margin-top: 40px;
+      padding-top: 0;
     }
     .step:first-of-type {
       margin-top: 0;
     }
+    
+    /* Step pill to title spacing */
+    .step-pill {
+      margin-bottom: 10px;
+    }
 
-    /* Step titles (Upload a Photo / Animation Instructions / etc.) */
+    /* Step titles (Upload a Photo / Choose a Prompt / etc.) */
     .step-title {
-      font-size: 22px;          /* bigger */
+      font-size: 22px;
       font-weight: 800;
       line-height: 1.15;
-      margin: 0 0 12px;
+      margin: 0 0 16px;
     }
 
     /* Optional "or Try an example photo" row */
@@ -819,15 +827,20 @@
       color: #334155;
     }
 
-    /* Make Step 3 feel intentional */
+    /* Step 3 — same spacing as other steps */
     .step.step-3 {
-      margin-top: 34px;
-      padding-top: 6px;
+      margin-top: 40px;
+      padding-top: 0;
     }
 
     /* Animate button spacing */
     .steps-form .animate-btn {
-      margin-top: 8px;
+      margin-top: 0;
+      margin-bottom: 18px;
+    }
+    
+    /* Consistent spacing for step actions */
+    .step-action {
       margin-bottom: 16px;
     }
 
@@ -855,6 +868,7 @@
       color: #6b7280;
       background: #f8fafc;
       cursor: pointer;
+      margin-bottom: 10px;
       transition:
         border-color 0.18s ease,
         background 0.18s ease,
@@ -1009,7 +1023,7 @@
     }
     @media (max-width: 480px) {
       #videoActions > div {
-        width: 100%;
+      width: 100%;
       }
       #saveToPhotosBtn,
       #downloadBtn {
@@ -1288,7 +1302,7 @@
       /* Header */
       .site-header {
         padding: 12px 14px;
-        flex-wrap: wrap;
+      flex-wrap: wrap;
         gap: 8px;
       }
       .site-logo {
@@ -1369,18 +1383,35 @@
       .steps-form {
         padding: 18px 14px 22px;
       }
+      
+      /* Uniform step spacing on mobile */
+      .step {
+        margin-top: 32px;
+      }
+      .step.step-3 {
+        margin-top: 32px;
+      }
+      .step-label {
+        margin-bottom: 8px;
+      }
       .step-pill {
         font-size: 12px;
         padding: 0 12px;
         height: 28px;
+        margin-bottom: 8px;
       }
       .step-title {
         font-size: 18px;
+        margin-bottom: 14px;
+      }
+      .step-action {
+        margin-bottom: 14px;
       }
       .dropzone {
         min-height: 100px;
         padding: 14px;
         font-size: 14px;
+        margin-bottom: 8px;
       }
       .textarea-input,
       textarea {
@@ -1399,9 +1430,15 @@
       .step-helper,
       .step-description {
         font-size: 14px;
+        margin-top: 0;
+        margin-bottom: 14px;
       }
       .upload-title {
-        font-size: 16px;
+        font-size: 18px;
+      }
+      .upload-label {
+        gap: 4px !important;
+        margin-bottom: 10px;
       }
       .example-photo-inline {
         font-size: 13px;
@@ -1510,8 +1547,26 @@
         padding: 9px 16px;
         font-size: 12px;
       }
+      .step {
+        margin-top: 28px;
+      }
+      .step.step-3 {
+        margin-top: 28px;
+      }
       .step-title {
         font-size: 16px;
+        margin-bottom: 12px;
+      }
+      .upload-title {
+        font-size: 16px;
+      }
+      .step-action {
+        margin-bottom: 12px;
+      }
+      .step-helper,
+      .step-description {
+        font-size: 13px;
+        margin-bottom: 12px;
       }
     }
   </style>
@@ -1565,7 +1620,7 @@
       <p class="hero-tagline">
         Upload a picture, choose a prompt, and watch your memories come alive.
       </p>
-      <p class="hero-sub">Your first animation is free.</p>
+      <p class="hero-sub">Your first animation is free. Scroll below to start.</p>
     </header>
 
     <!-- GALLERY (no text label) -->
@@ -1676,7 +1731,6 @@
       <div class="row">
           <div class="row-label upload-label">
             <span class="upload-title">Upload a Photo</span>
-            <span class="upload-or">or</span>
             <button
               type="button"
               class="example-photo-inline"
@@ -1700,28 +1754,28 @@
         <!-- STEP 2 (MATCHED STRUCTURE) -->
         <div class="step">
           <span class="step-pill">STEP 2</span>
-          <div class="step-title">Animation Instructions</div>
+          <div class="step-title">Choose a Prompt</div>
 
-          <textarea
-            id="animationText"
-            name="animationText"
-            rows="4"
-            placeholder="Example: The two people gently look at each other and smile with natural movement that is clearly visible on video."
-            class="textarea-input"
-          ></textarea>
-
-          <!-- Prompt suggestions appear here (above the button) -->
-          <div id="promptList" style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:14px;"></div>
-
-          <div class="step-action">
+          <div class="step-action" style="margin-bottom: 18px;">
             <button id="promptBtn" type="button" class="btn-primary">
               Get Prompt Suggestions
             </button>
           </div>
 
-          <p class="step-helper">
-            Please select one of the prompts above or write your own animation instructions.
+          <p class="step-helper" style="margin-top: 0; margin-bottom: 18px; color: #64748b;">
+            Use the suggestions button to select a prompt or write your own animation instructions.
           </p>
+
+          <!-- Prompt suggestions appear here (between helper text and textarea) -->
+          <div id="promptList" style="display:flex; flex-wrap:wrap; gap:10px; margin-bottom:16px;"></div>
+
+      <textarea
+            id="animationText"
+            name="animationText"
+            rows="4"
+            placeholder="Example: The two people gently look at each other and smile with natural movement that is clearly visible on video."
+            class="textarea-input"
+      ></textarea>
         </div>
 
         <!-- Hidden: original example photo button for JS compatibility -->
@@ -1733,6 +1787,7 @@
         <div class="step step-3">
 
           <span class="step-pill">STEP 3</span>
+          <div class="step-title">Animate, Download & Share</div>
 
           <div class="step-action">
             <button id="animateButton" type="button" class="btn-primary animate-btn">
