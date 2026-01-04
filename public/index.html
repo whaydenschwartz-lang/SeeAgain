@@ -1584,6 +1584,8 @@
             muted
             loop
             playsinline
+            preload="metadata"
+            style="transition: opacity 0.2s ease;"
           ></video>
         </div>
 
@@ -2041,7 +2043,7 @@
       videoWatermark.style.display = shouldWatermark ? "inline-flex" : "none";
     }
 
-    // GALLERY LOGIC
+    // GALLERY LOGIC WITH OPTIMIZED PRELOADING
     const galleryItems = [
       {
         still: "/gallery/example1-still (1).jpg",
@@ -2074,17 +2076,81 @@
     let galleryIndex = 0;
     let isGalleryAnimating = false;
 
-    function renderGalleryItem(index) {
+    // Video blob cache for instant switching (max 3 entries)
+    const videoCache = new Map();
+    const MAX_CACHE_SIZE = 3;
+
+    async function preloadVideo(url) {
+      if (videoCache.has(url)) return videoCache.get(url);
+      
+      try {
+        const response = await fetch(url);
+        if (!response.ok) return url;
+        
+        const blob = await response.blob();
+        const blobUrl = URL.createObjectURL(blob);
+        
+        // Evict oldest if cache is full
+        if (videoCache.size >= MAX_CACHE_SIZE) {
+          const oldest = videoCache.keys().next().value;
+          URL.revokeObjectURL(videoCache.get(oldest));
+          videoCache.delete(oldest);
+        }
+        
+        videoCache.set(url, blobUrl);
+        return blobUrl;
+      } catch (err) {
+        console.log("Preload failed, will use direct URL:", url);
+        return url;
+      }
+    }
+
+    function preloadAdjacentVideos(currentIndex) {
+      const prevIndex = (currentIndex - 1 + galleryItems.length) % galleryItems.length;
+      const nextIndex = (currentIndex + 1) % galleryItems.length;
+      
+      // Preload adjacent videos in background
+      preloadVideo(galleryItems[prevIndex].video);
+      preloadVideo(galleryItems[nextIndex].video);
+    }
+
+    async function renderGalleryItem(index) {
       const item = galleryItems[index];
       if (!item) return;
 
+      // Update still image
       galleryStillEl.src = item.still;
-      galleryVideoEl.src = item.video;
 
-      // restart video playback on change
+      // Pause current playback
       galleryVideoEl.pause();
+
+      // Show loading state
+      galleryVideoEl.style.opacity = "0.7";
+
+      // Get cached blob URL or original URL
+      const videoUrl = videoCache.has(item.video) 
+        ? videoCache.get(item.video) 
+        : item.video;
+
+      // Set source and load
+      galleryVideoEl.src = videoUrl;
       galleryVideoEl.load();
-      galleryVideoEl.play().catch(() => {});
+
+      // Wait for video to be ready, then play
+      const onCanPlay = () => {
+        galleryVideoEl.style.opacity = "1";
+        galleryVideoEl.play().catch(() => {});
+        galleryVideoEl.removeEventListener("canplay", onCanPlay);
+      };
+      galleryVideoEl.addEventListener("canplay", onCanPlay);
+
+      // Fallback: remove loading state after timeout
+      setTimeout(() => {
+        galleryVideoEl.style.opacity = "1";
+      }, 1500);
+
+      // Preload adjacent videos for next switch
+      preloadAdjacentVideos(index);
     }
 
     /**
@@ -2167,8 +2233,12 @@
         });
       }
 
-      // initial load
-      renderGalleryItem(galleryIndex);
+      // Initial load + preload first video and adjacent
+      (async () => {
+        // Preload current video first
+        await preloadVideo(galleryItems[0].video);
+        renderGalleryItem(galleryIndex);
+      })();
     }
 
     const DEV_MODE =
@@ -2308,6 +2378,48 @@
     let latestVideoUrl = null;
     let latestDownloadUrl = null;
 
+    // ---- WAKE LOCK & KEEP-ALIVE (prevent sleep during generation) ----
+    let wakeLock = null;
+    let isGenerating = false;
+
+    async function requestWakeLock() {
+      try {
+        if ("wakeLock" in navigator) {
+          wakeLock = await navigator.wakeLock.request("screen");
+          console.log("Wake Lock activated - screen will stay on");
+          
+          wakeLock.addEventListener("release", () => {
+            console.log("Wake Lock released");
+          });
+        }
+      } catch (err) {
+        console.log("Wake Lock not available:", err.message);
+      }
+    }
+
+    function releaseWakeLock() {
+      if (wakeLock) {
+        wakeLock.release();
+        wakeLock = null;
+      }
+    }
+
+    // Re-acquire wake lock if page becomes visible again during generation
+    document.addEventListener("visibilitychange", async () => {
+      if (isGenerating && document.visibilityState === "visible" && !wakeLock) {
+        await requestWakeLock();
+      }
+    });
+
+    // Warn user before leaving page during generation
+    window.addEventListener("beforeunload", (e) => {
+      if (isGenerating) {
+        e.preventDefault();
+        e.returnValue = "Your animation is still generating. Are you sure you want to leave?";
+        return e.returnValue;
+      }
+    });
+
     // ---- GENERATE ANIMATION ----
     async function generateAnimation(options = {}) {
       const { isWatermarked = true } = options;
@@ -2324,6 +2436,10 @@
         alert("Please enter animation instructions or pick a prompt.");
         throw new Error("No prompt");
       }
+
+      // Activate keep-awake protections
+      isGenerating = true;
+      await requestWakeLock();
 
       // ✅ Issue #2: Soft guardrail for prompts that often produce "no motion"
       // (We do NOT block. We just warn + let them continue.)
@@ -2438,6 +2554,10 @@
         // (The baked watermark in the MP4 is controlled by hideWatermark sent to server)
         updateWatermarkVisibility(isWatermarked);
       } finally {
+        // Release keep-awake protections
+        isGenerating = false;
+        releaseWakeLock();
+
         if (progressIntervalId) {
           clearInterval(progressIntervalId);
           progressIntervalId = null;

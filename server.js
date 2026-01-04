@@ -32,7 +32,20 @@ if (!AIML_API_KEY) {
 app.use(cors());
 app.use(formData.parse());
 app.use(express.json({ limit: '20mb' }));
-app.use(express.static(path.join(__dirname, "public")));
+// Serve static files with caching for videos
+app.use(express.static(path.join(__dirname, "public"), {
+  maxAge: "1d",  // Cache static assets for 1 day
+  setHeaders: (res, filePath) => {
+    // Extra long cache for gallery videos (they never change)
+    if (filePath.includes("/gallery/") && filePath.endsWith(".mp4")) {
+      res.setHeader("Cache-Control", "public, max-age=604800"); // 7 days
+    }
+    // Shorter cache for generated outputs (user might regenerate)
+    if (filePath.includes("/outputs/") && filePath.endsWith(".mp4")) {
+      res.setHeader("Cache-Control", "public, max-age=3600"); // 1 hour
+    }
+  }
+}));
 
 // ---- STREAMING DOWNLOAD ROUTE (for iOS Save to Photos) ----
 app.get("/api/download/:filename", (req, res) => {
@@ -135,8 +148,12 @@ async function bakeLogoWatermark({ inputPath, outputPath }) {
       "-map", "[outv]",
       "-map", "0:a?",
       "-c:v", "libx264",
+      "-profile:v", "baseline",   // iPhone compatibility + fast decode
+      "-level", "3.0",
       "-pix_fmt", "yuv420p",
-      "-movflags", "+faststart",
+      "-movflags", "+faststart",  // Fast start for streaming
+      "-preset", "fast",          // Faster encode, still good quality
+      "-crf", "23",               // Good quality
       outputPath
     ];
 
