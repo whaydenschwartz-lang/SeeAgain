@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <title>SeeAgain — Payment Successful</title>
+    <title>SeeAgain — Payment Authorized</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <style>
       :root {
@@ -81,6 +81,16 @@
         margin-right: 8px;
       }
 
+      .info-note {
+        margin-top: 16px;
+        padding: 12px 16px;
+        background: #f8fafc;
+        border-radius: 12px;
+        font-size: 13px;
+        color: #64748b;
+        border: 1px solid #e2e8f0;
+      }
+
       @keyframes spin {
         to { transform: rotate(360deg); }
       }
@@ -89,9 +99,15 @@
   <body>
     <div class="card">
       <div class="logo">See<span>Again</span></div>
-      <div class="pill">✓ Payment successful</div>
+      <div class="pill">✓ Payment authorized</div>
       <h1>Thank you!</h1>
-      <p>Your payment went through. You now have unlimited watermark-free animations.</p>
+      <p>Your payment has been authorized.</p>
+      <p>Your animation is about to start generating.</p>
+      
+      <div class="info-note">
+        <strong>Note:</strong> You'll only be charged if your animation generates successfully. 
+        If anything goes wrong, your card won't be charged.
+      </div>
       
       <p class="loading">
         <span class="spinner"></span>
@@ -100,17 +116,28 @@
     </div>
 
     <script>
-      // Mark user as paid
-      localStorage.setItem("paid", "true");
+      // Extract jobId from URL if present
+      const urlParams = new URLSearchParams(window.location.search);
+      const jobId = urlParams.get("jobId");
       
-      // Clear free generation counter
+      // Mark user as having an authorized payment (not yet charged)
+      localStorage.setItem("payment_authorized", "true");
+      
+      // Store the jobId for the animation request
+      if (jobId) {
+        localStorage.setItem("pending_job_id", jobId);
+      }
+      
+      // Clear free generation counter (they're upgrading to paid)
       localStorage.removeItem("free_generations");
 
       // Redirect back to main app with success flag
       setTimeout(() => {
-        window.location.href = "/?payment=success";
+        const redirectUrl = jobId 
+          ? `/?payment=success&jobId=${encodeURIComponent(jobId)}`
+          : "/?payment=success";
+        window.location.href = redirectUrl;
       }, 1500);
     </script>
   </body>
 </html>
-

@@ -2477,7 +2477,7 @@
 
     // ---- GENERATE ANIMATION ----
     async function generateAnimation(options = {}) {
-      const { isWatermarked = true } = options;
+      const { isWatermarked = true, jobId = null } = options;
       // hideWatermark is the OPPOSITE of isWatermarked (sent to server)
       const hideWatermark = !isWatermarked;
       const prompt = animationText.value.trim();
@@ -2565,16 +2565,22 @@
       }, stepMs);
 
       try {
+        // Build request payload - include jobId for payment capture if present
+        const payload = {
+          imageBase64: currentImageBase64,
+          prompt,
+          hideWatermark,
+        };
+        if (jobId) {
+          payload.jobId = jobId;
+        }
+
         const res = await fetch("/animate_photo", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({
-            imageBase64: currentImageBase64,
-            prompt,
-            hideWatermark,
-          }),
+          body: JSON.stringify(payload),
         });
 
         if (!res.ok) {
@@ -2645,16 +2651,22 @@
     }
 
     async function startStripeCheckout() {
+      // Generate a unique jobId for payment tracking
+      const jobId = `job-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      
       // Save pending animation data before redirecting to checkout
       const pendingData = {
         imageBase64: currentImageBase64,
         prompt: animationText.value,
-        timestamp: Date.now()
+        timestamp: Date.now(),
+        jobId: jobId  // Include jobId for payment capture
       };
       localStorage.setItem("pendingAnimation", JSON.stringify(pendingData));
 
       const res = await fetch("/create-checkout-session", {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ jobId: jobId })
       });
 
       if (!res.ok) {
@@ -2768,20 +2780,26 @@
         currentImageBase64 = pendingData.imageBase64;
         animationText.value = pendingData.prompt;
         dropzoneText.textContent = "Photo restored from checkout";
+        
+        // Extract jobId for payment capture
+        const jobId = pendingData.jobId || null;
 
         // Clear pending data
         localStorage.removeItem("pendingAnimation");
+        localStorage.removeItem("pending_job_id");
+        localStorage.removeItem("payment_authorized");
 
         // Mark user as paid (this was set by success page, but ensure it's set)
         localStorage.setItem("paid", "true");
         localStorage.removeItem("free_generations");
 
         // Auto-trigger the animation (without watermark since they paid!)
+        // Pass jobId so server can capture the payment on success
         animateBtn.disabled = true;
         animateBtn.textContent = "Please keep this tab open while your animation is generating (up to 5 minutes).";
-        statusEl.textContent = "Payment confirmed!";
+        statusEl.textContent = "Payment authorized — generating your animation...";
 
-        await generateAnimation({ isWatermarked: false });
+        await generateAnimation({ isWatermarked: false, jobId: jobId });
 
         animateBtn.textContent = "Animate Photo";
         animateBtn.disabled = false;
@@ -2789,7 +2807,11 @@
       } catch (err) {
         console.error("Error processing post-payment animation:", err);
         localStorage.removeItem("pendingAnimation");
-        animationError.textContent = "Animation failed after payment. Please try again or contact support.";
+        localStorage.removeItem("pending_job_id");
+        localStorage.removeItem("payment_authorized");
+        
+        // Payment is automatically released when animation fails (no charge)
+        animationError.textContent = "Animation failed. Your card was not charged. Please try again or contact support.";
         animationError.style.display = "block";
         animateBtn.disabled = false;
         updateAnimateButtonLabelFromStorage();

@@ -3,3 +3,4 @@ outputs/
 public/outputs/
 .DS_Store
 .env
+payments.json

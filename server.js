@@ -1,3 +1,45 @@
+/*
+================================================================================
+  SEEAGAIN SERVER — SAFE STRIPE PAYMENTS WITH MANUAL CAPTURE
+================================================================================
+
+REQUIRED ENV VARS:
+  - STRIPE_SECRET_KEY        : Your Stripe secret key (sk_live_... or sk_test_...)
+  - STRIPE_WEBHOOK_SECRET    : Webhook signing secret from Stripe dashboard (whsec_...)
+  - GEMINI_API_KEY           : Google Gemini API key for prompt suggestions
+  - AIML_API_KEY             : AI/ML API key for Kling video generation
+  - PORT                     : (optional) Server port, defaults to 3000
+
+HOW TO TEST WITH STRIPE CLI:
+  1. Install Stripe CLI: https://stripe.com/docs/stripe-cli
+  2. Login: stripe login
+  3. Forward webhooks locally:
+       stripe listen --forward-to localhost:3000/stripe/webhook
+  4. Copy the webhook signing secret shown and set it as STRIPE_WEBHOOK_SECRET
+  5. Test checkout flow:
+       stripe trigger checkout.session.completed
+
+PAYMENT FLOW (Authorize-then-Capture):
+  1. User clicks "Animate Photo" → if payment required, creates Checkout Session
+     with capture_method: "manual" and jobId in metadata
+  2. Stripe checkout completes → webhook "checkout.session.completed" fires
+     → server records paymentIntentId with jobId, status = "authorized"
+  3. Animation job runs (Kling API call in /animate_photo)
+  4. On success: capture PaymentIntent → user is charged
+  5. On failure: cancel PaymentIntent → hold is released, no charge
+
+STORAGE:
+  - payments.json: Persists jobId -> { paymentIntentId, sessionId, status, createdAt }
+  - Survives server restarts
+  - Status flow: authorized -> captured | canceled | capture_failed | cancel_failed
+
+SAFETY TIMEOUT:
+  - Every 30 minutes, cancels any "authorized" payments older than 2 hours
+  - Prevents stuck holds if animation never completes
+
+================================================================================
+*/
+
 import express from "express";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -20,6 +62,7 @@ const __dirname = path.dirname(__filename);
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const AIML_API_KEY = process.env.AIML_API_KEY;
+const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET;
 
 if (!GEMINI_API_KEY) {
   console.warn('⚠️ Missing GEMINI_API_KEY');
@@ -27,11 +70,300 @@ if (!GEMINI_API_KEY) {
 if (!AIML_API_KEY) {
   console.warn('⚠️ Missing AIML_API_KEY');
 }
+if (!STRIPE_WEBHOOK_SECRET) {
+  console.warn('⚠️ Missing STRIPE_WEBHOOK_SECRET - webhooks will not be verified');
+}
 
-// ---- MIDDLEWARE ----
+// ==============================================================================
+// PERSISTENT PAYMENT STORAGE (survives restarts)
+// ==============================================================================
+
+const PAYMENTS_FILE = path.join(__dirname, "payments.json");
+
+// In-memory cache, synced to disk
+let paymentsStore = {};
+
+function loadPayments() {
+  try {
+    if (fs.existsSync(PAYMENTS_FILE)) {
+      const data = fs.readFileSync(PAYMENTS_FILE, "utf-8");
+      paymentsStore = JSON.parse(data);
+      console.log(`📁 Loaded ${Object.keys(paymentsStore).length} payment records from payments.json`);
+    }
+  } catch (err) {
+    console.error("⚠️ Failed to load payments.json:", err.message);
+    paymentsStore = {};
+  }
+}
+
+function savePayments() {
+  try {
+    fs.writeFileSync(PAYMENTS_FILE, JSON.stringify(paymentsStore, null, 2));
+  } catch (err) {
+    console.error("⚠️ Failed to save payments.json:", err.message);
+  }
+}
+
+// Record a new payment authorization
+function recordPayment(jobId, paymentIntentId, sessionId) {
+  if (!jobId) return;
+  
+  // Check if already exists (idempotency for duplicate webhooks)
+  if (paymentsStore[jobId]) {
+    console.log(`📝 Payment already recorded for jobId: ${jobId}`);
+    return paymentsStore[jobId];
+  }
+  
+  const record = {
+    paymentIntentId,
+    sessionId,
+    status: "authorized",
+    createdAt: Date.now()
+  };
+  
+  paymentsStore[jobId] = record;
+  savePayments();
+  
+  console.log(`📝 Recorded payment: jobId=${jobId}, piId=${paymentIntentId}, status=authorized`);
+  return record;
+}
+
+// Update job status
+function markJobStatus(jobId, status) {
+  if (!jobId || !paymentsStore[jobId]) return null;
+  
+  const record = paymentsStore[jobId];
+  const oldStatus = record.status;
+  record.status = status;
+  record.updatedAt = Date.now();
+  savePayments();
+  
+  console.log(`📝 Status update: jobId=${jobId}, ${oldStatus} -> ${status}`);
+  return record;
+}
+
+// Get payment record
+function getPayment(jobId) {
+  return paymentsStore[jobId] || null;
+}
+
+// Check if a job has pending render status stored (for race condition handling)
+function getPendingJobStatus(jobId) {
+  const record = paymentsStore[jobId];
+  if (!record) return null;
+  
+  // If job completed before webhook arrived
+  if (record.status === "render_succeeded" || record.status === "render_failed") {
+    return record.status;
+  }
+  return null;
+}
+
+// Store job completion status (for race condition: job finishes before webhook)
+function recordJobCompletion(jobId, renderStatus) {
+  if (!paymentsStore[jobId]) {
+    // Job finished before webhook - create placeholder
+    paymentsStore[jobId] = {
+      paymentIntentId: null,
+      sessionId: null,
+      status: renderStatus,
+      createdAt: Date.now()
+    };
+    savePayments();
+    console.log(`📝 Job completion recorded (before webhook): jobId=${jobId}, status=${renderStatus}`);
+    return paymentsStore[jobId];
+  }
+  
+  // Normal case: webhook already arrived
+  return markJobStatus(jobId, renderStatus);
+}
+
+// Load payments on startup
+loadPayments();
+
+// ==============================================================================
+// STRIPE CAPTURE / CANCEL LOGIC
+// ==============================================================================
+
+async function capturePayment(jobId) {
+  const record = getPayment(jobId);
+  if (!record || !record.paymentIntentId) {
+    console.log(`⚠️ Cannot capture: no paymentIntentId for jobId=${jobId}`);
+    return false;
+  }
+  
+  // Idempotency check
+  if (record.status === "captured") {
+    console.log(`✅ Already captured: jobId=${jobId}`);
+    return true;
+  }
+  
+  if (record.status !== "authorized" && record.status !== "render_succeeded") {
+    console.log(`⚠️ Cannot capture: invalid status=${record.status} for jobId=${jobId}`);
+    return false;
+  }
+  
+  try {
+    console.log(`💳 Capturing payment: jobId=${jobId}, piId=${record.paymentIntentId}`);
+    await stripe.paymentIntents.capture(record.paymentIntentId);
+    markJobStatus(jobId, "captured");
+    console.log(`✅ Payment captured successfully: jobId=${jobId}`);
+    return true;
+  } catch (err) {
+    console.error(`❌ Capture failed for jobId=${jobId}:`, err.message);
+    markJobStatus(jobId, "capture_failed");
+    return false;
+  }
+}
+
+async function cancelPayment(jobId) {
+  const record = getPayment(jobId);
+  if (!record || !record.paymentIntentId) {
+    console.log(`⚠️ Cannot cancel: no paymentIntentId for jobId=${jobId}`);
+    return false;
+  }
+  
+  // Idempotency check
+  if (record.status === "canceled") {
+    console.log(`✅ Already canceled: jobId=${jobId}`);
+    return true;
+  }
+  
+  if (record.status !== "authorized" && record.status !== "render_failed") {
+    console.log(`⚠️ Cannot cancel: invalid status=${record.status} for jobId=${jobId}`);
+    return false;
+  }
+  
+  try {
+    console.log(`🚫 Canceling payment: jobId=${jobId}, piId=${record.paymentIntentId}`);
+    await stripe.paymentIntents.cancel(record.paymentIntentId);
+    markJobStatus(jobId, "canceled");
+    console.log(`✅ Payment canceled (hold released): jobId=${jobId}`);
+    return true;
+  } catch (err) {
+    console.error(`❌ Cancel failed for jobId=${jobId}:`, err.message);
+    markJobStatus(jobId, "cancel_failed");
+    return false;
+  }
+}
+
+// Handle job completion - captures or cancels based on render result
+async function handleJobCompletion(jobId, success) {
+  const renderStatus = success ? "render_succeeded" : "render_failed";
+  
+  const record = getPayment(jobId);
+  
+  if (!record || !record.paymentIntentId) {
+    // Webhook hasn't arrived yet - store the completion status
+    // It will be processed when webhook arrives
+    recordJobCompletion(jobId, renderStatus);
+    console.log(`⏳ Job completed before webhook: jobId=${jobId}, status=${renderStatus}`);
+    return;
+  }
+  
+  // Update status and capture/cancel
+  markJobStatus(jobId, renderStatus);
+  
+  if (success) {
+    await capturePayment(jobId);
+  } else {
+    await cancelPayment(jobId);
+  }
+}
+
+// ==============================================================================
+// STRIPE WEBHOOK ENDPOINT - MUST BE BEFORE express.json() MIDDLEWARE
+// ==============================================================================
+
+app.post("/stripe/webhook", express.raw({ type: "application/json" }), async (req, res) => {
+  const sig = req.headers["stripe-signature"];
+  
+  let event;
+  
+  try {
+    if (STRIPE_WEBHOOK_SECRET) {
+      event = stripe.webhooks.constructEvent(req.body, sig, STRIPE_WEBHOOK_SECRET);
+    } else {
+      // Fallback for development without webhook secret
+      event = JSON.parse(req.body.toString());
+      console.warn("⚠️ Webhook signature not verified (STRIPE_WEBHOOK_SECRET not set)");
+    }
+  } catch (err) {
+    console.error("❌ Webhook signature verification failed:", err.message);
+    return res.status(400).send(`Webhook Error: ${err.message}`);
+  }
+  
+  console.log(`📨 Stripe webhook received: ${event.type}`);
+  
+  // Handle the event
+  switch (event.type) {
+    case "checkout.session.completed": {
+      const session = event.data.object;
+      const jobId = session.metadata?.jobId;
+      const paymentIntentId = session.payment_intent;
+      
+      console.log(`💰 Checkout completed: sessionId=${session.id}, jobId=${jobId}, piId=${paymentIntentId}`);
+      
+      if (jobId && paymentIntentId) {
+        // Check if job already completed before webhook arrived (race condition)
+        const pendingStatus = getPendingJobStatus(jobId);
+        
+        if (pendingStatus) {
+          // Job finished before webhook - update with payment info and process
+          paymentsStore[jobId].paymentIntentId = paymentIntentId;
+          paymentsStore[jobId].sessionId = session.id;
+          savePayments();
+          
+          console.log(`🔄 Processing delayed job completion: jobId=${jobId}, status=${pendingStatus}`);
+          
+          if (pendingStatus === "render_succeeded") {
+            await capturePayment(jobId);
+          } else if (pendingStatus === "render_failed") {
+            await cancelPayment(jobId);
+          }
+        } else {
+          // Normal flow: record the payment authorization
+          recordPayment(jobId, paymentIntentId, session.id);
+        }
+      } else {
+        console.warn("⚠️ Checkout completed but missing jobId or paymentIntentId");
+      }
+      break;
+    }
+    
+    case "checkout.session.async_payment_succeeded": {
+      const session = event.data.object;
+      console.log(`📨 Async payment succeeded: sessionId=${session.id}`);
+      // Handle async payment methods (bank transfers, etc.) if needed
+      break;
+    }
+    
+    case "checkout.session.async_payment_failed": {
+      const session = event.data.object;
+      const jobId = session.metadata?.jobId;
+      console.log(`❌ Async payment failed: sessionId=${session.id}, jobId=${jobId}`);
+      if (jobId) {
+        markJobStatus(jobId, "payment_failed");
+      }
+      break;
+    }
+    
+    default:
+      console.log(`📨 Unhandled webhook event: ${event.type}`);
+  }
+  
+  // Respond quickly to acknowledge receipt
+  res.status(200).json({ received: true });
+});
+
+// ==============================================================================
+// MIDDLEWARE (after webhook endpoint)
+// ==============================================================================
+
 app.use(cors());
 app.use(formData.parse());
 app.use(express.json({ limit: '20mb' }));
+
 // Serve static files with caching for videos
 app.use(express.static(path.join(__dirname, "public"), {
   maxAge: "1d",  // Cache static assets for 1 day
@@ -206,9 +538,15 @@ app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "index.html"));
 });
 
-// ---- STRIPE CHECKOUT ROUTE ----
+// ---- STRIPE CHECKOUT ROUTE (with manual capture) ----
 app.post("/create-checkout-session", async (req, res) => {
   try {
+    // Generate a unique jobId BEFORE creating session
+    // Frontend should pass this, or we generate one
+    const jobId = req.body.jobId || `job-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    
+    console.log(`💳 Creating checkout session with jobId: ${jobId}`);
+    
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ["card"],
       mode: "payment",
@@ -222,11 +560,24 @@ app.post("/create-checkout-session", async (req, res) => {
           quantity: 1,
         },
       ],
-      success_url: `${req.protocol}://${req.get("host")}/?payment=success`,
-      cancel_url: `${req.protocol}://${req.get("host")}/?payment=cancelled`,
+      // Session-level metadata
+      metadata: {
+        jobId: jobId
+      },
+      // Payment intent settings for manual capture
+      payment_intent_data: {
+        capture_method: "manual",
+        metadata: {
+          jobId: jobId
+        }
+      },
+      success_url: `${req.protocol}://${req.get("host")}/success.html?jobId=${jobId}`,
+      cancel_url: `${req.protocol}://${req.get("host")}/cancel.html?jobId=${jobId}`,
     });
 
-    res.json({ url: session.url });
+    console.log(`✅ Checkout session created: sessionId=${session.id}, jobId=${jobId}`);
+    
+    res.json({ url: session.url, jobId: jobId });
   } catch (err) {
     console.error("Stripe error:", err);
     res.status(500).send("Error creating checkout session");
@@ -247,9 +598,23 @@ app.get("/cancel", (req, res) => {
 app.post("/animate_photo", async (req, res) => {
   console.log('➡️  /animate_photo called');
 
+  // Extract jobId for payment tracking (if this is a paid animation)
+  const jobId = req.body.jobId || null;
+  const isPaidJob = !!jobId;
+  
+  if (isPaidJob) {
+    console.log(`💰 Paid animation job: ${jobId}`);
+  }
+
   try {
     if (!AIML_API_KEY) {
       console.error('❌ AIML_API_KEY missing');
+      
+      // If this is a paid job that failed, cancel the payment
+      if (isPaidJob) {
+        await handleJobCompletion(jobId, false);
+      }
+      
       return res.status(500).json({ error: 'Kling API key missing.' });
     }
 
@@ -257,11 +622,21 @@ app.post("/animate_photo", async (req, res) => {
 
     if (!imageBase64) {
       console.error("❌ No imageBase64 in request body");
+      
+      if (isPaidJob) {
+        await handleJobCompletion(jobId, false);
+      }
+      
       return res.status(400).json({ error: "No image data provided (imageBase64 missing)" });
     }
 
     if (!prompt) {
       console.error("❌ No prompt in request body");
+      
+      if (isPaidJob) {
+        await handleJobCompletion(jobId, false);
+      }
+      
       return res.status(400).json({ error: "No prompt provided for animation" });
     }
 
@@ -298,6 +673,11 @@ app.post("/animate_photo", async (req, res) => {
     if (!createResp.ok) {
       const errText = await createResp.text();
       console.error('❌ Kling create error:', createResp.status, errText);
+      
+      if (isPaidJob) {
+        await handleJobCompletion(jobId, false);
+      }
+      
       return res.status(500).json({
         error: 'Failed to create Kling generation job.',
         details: errText,
@@ -321,6 +701,11 @@ app.post("/animate_photo", async (req, res) => {
 
       if (!generationId) {
         console.error('❌ No generation_id / id / task_id in Kling response');
+        
+        if (isPaidJob) {
+          await handleJobCompletion(jobId, false);
+        }
+        
         return res.status(500).json({
           error: 'Kling did not return a video URL or generation ID.',
           details: job,
@@ -350,6 +735,11 @@ app.post("/animate_photo", async (req, res) => {
         if (!statusResp.ok) {
           const errText = await statusResp.text();
           console.error('❌ Kling status error:', statusResp.status, errText);
+          
+          if (isPaidJob) {
+            await handleJobCompletion(jobId, false);
+          }
+          
       return res.status(500).json({
             error: 'Error checking Kling job status.',
             details: errText,
@@ -377,6 +767,11 @@ app.post("/animate_photo", async (req, res) => {
 
         if (status === 'failed' || status === 'error') {
           console.error('❌ Kling job failed:', JSON.stringify(statusData, null, 2));
+          
+          if (isPaidJob) {
+            await handleJobCompletion(jobId, false);
+          }
+          
           return res.status(500).json({
             error: 'Kling generation failed.',
             details: statusData,
@@ -386,6 +781,11 @@ app.post("/animate_photo", async (req, res) => {
 
       if (!providerVideoUrl) {
         console.error('❌ Timed out waiting for Kling video');
+        
+        if (isPaidJob) {
+          await handleJobCompletion(jobId, false);
+        }
+        
         return res.status(500).json({
           error: 'Timed out waiting for Kling video.',
         });
@@ -432,18 +832,60 @@ app.post("/animate_photo", async (req, res) => {
       console.log('💎 Paid animation - no watermark');
     }
 
+    // SUCCESS! If this is a paid job, capture the payment
+    if (isPaidJob) {
+      console.log(`✅ Animation succeeded for paid job: ${jobId}`);
+      await handleJobCompletion(jobId, true);
+    }
+
     const finalFilename = path.basename(finalPath);
     return res.json({
       ok: true,
       videoUrl: `/outputs/${finalFilename}`,
       downloadUrl: `/api/download/${finalFilename}`,
-      watermarked: wasWatermarked
+      watermarked: wasWatermarked,
+      jobId: jobId
     });
 
   } catch (err) {
     console.error('💥 Error in /animate_photo:', err);
+    
+    // If this is a paid job that failed, cancel the payment
+    if (isPaidJob) {
+      await handleJobCompletion(jobId, false);
+    }
+    
     res.status(500).json({ error: err.message || 'Unexpected error in /animate_photo.' });
   }
+});
+
+// ==============================================================================
+// MANUAL JOB COMPLETION ENDPOINT (for external render pipelines if needed)
+// ==============================================================================
+
+app.post("/jobs/:jobId/complete", async (req, res) => {
+  const { jobId } = req.params;
+  const { status } = req.body || {};
+  
+  if (!jobId) {
+    return res.status(400).json({ error: "Missing jobId" });
+  }
+  
+  if (status !== "success" && status !== "failed") {
+    return res.status(400).json({ error: "Status must be 'success' or 'failed'" });
+  }
+  
+  console.log(`📨 Job completion API called: jobId=${jobId}, status=${status}`);
+  
+  await handleJobCompletion(jobId, status === "success");
+  
+  const record = getPayment(jobId);
+  
+  res.json({
+    ok: true,
+    jobId,
+    paymentStatus: record?.status || "unknown"
+  });
 });
 
 // ==================================================
@@ -695,6 +1137,50 @@ FORMAT:
   }
 });
 
+// ==============================================================================
+// SAFETY TIMEOUT: Cancel stuck authorizations
+// ==============================================================================
+
+const AUTHORIZATION_TIMEOUT_MS = 2 * 60 * 60 * 1000; // 2 hours
+const CLEANUP_INTERVAL_MS = 30 * 60 * 1000; // 30 minutes
+
+async function cleanupStuckAuthorizations() {
+  console.log("🧹 Running stuck authorization cleanup...");
+  
+  const now = Date.now();
+  let cleanedCount = 0;
+  
+  for (const [jobId, record] of Object.entries(paymentsStore)) {
+    // Only process "authorized" status that hasn't been completed
+    if (record.status !== "authorized") continue;
+    
+    const age = now - record.createdAt;
+    
+    if (age > AUTHORIZATION_TIMEOUT_MS) {
+      console.log(`⏰ Authorization timeout: jobId=${jobId}, age=${Math.round(age / 60000)}min`);
+      
+      try {
+        await cancelPayment(jobId);
+        cleanedCount++;
+      } catch (err) {
+        console.error(`❌ Failed to cancel stuck auth for jobId=${jobId}:`, err.message);
+      }
+    }
+  }
+  
+  if (cleanedCount > 0) {
+    console.log(`🧹 Cleaned up ${cleanedCount} stuck authorizations`);
+  } else {
+    console.log("🧹 No stuck authorizations found");
+  }
+}
+
+// Run cleanup on startup (after a short delay)
+setTimeout(cleanupStuckAuthorizations, 10000);
+
+// Run cleanup every 30 minutes
+setInterval(cleanupStuckAuthorizations, CLEANUP_INTERVAL_MS);
+
 // ===== AUTO-CLEANUP OLD OUTPUT VIDEOS (OLDER THAN 7 DAYS) =====
 
 // Outputs folder inside /public for static serving
@@ -747,6 +1233,8 @@ const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
+  console.log(`Stripe webhook endpoint: POST /stripe/webhook`);
+  console.log(`Manual capture mode enabled for all paid animations`);
 });
 
 export default app;

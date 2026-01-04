@@ -94,14 +94,21 @@
       <div class="logo">See<span>Again</span></div>
       <div class="pill">Payment canceled</div>
       <h1>No worries!</h1>
-      <p>No charge was made. Your photo and prompt are still saved.</p>
+      <p>Your card was not charged. No hold was placed.</p>
+      <p>Your photo and prompt are still saved.</p>
       <p>You can try again whenever you're ready.</p>
 
-      <a href="/?payment=cancelled" class="button-link">Back to SeeAgain</a>
+      <a href="/" class="button-link">Back to SeeAgain</a>
 
       <p class="subtle">
         Your first animation is still free if you haven't used it yet.
       </p>
     </div>
+
+    <script>
+      // Clean up any pending job state
+      localStorage.removeItem("pending_job_id");
+      localStorage.removeItem("payment_authorized");
+    </script>
   </body>
 </html>
